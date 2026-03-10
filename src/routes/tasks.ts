@@ -6,6 +6,8 @@ import {
   updateTask,
   deleteTask,
   getTaskRunLogs,
+  saveMessage,
+  upsertChat,
 } from '../db/index.ts'
 import type { AgentManager } from '../agent/manager.ts'
 import type { AgentQueue } from '../agent/queue.ts'
@@ -28,6 +30,8 @@ export function createTasksRoutes(scheduler: Scheduler, agentManager: AgentManag
       prompt: string
       scheduleType: string
       scheduleValue: string
+      name?: string
+      description?: string
     }>()
 
     // 验证 agent 存在
@@ -67,6 +71,8 @@ export function createTasksRoutes(scheduler: Scheduler, agentManager: AgentManag
       scheduleType: body.scheduleType,
       scheduleValue: body.scheduleValue,
       nextRun,
+      name: body.name,
+      description: body.description,
     })
 
     const task = getTask(id)
@@ -84,18 +90,25 @@ export function createTasksRoutes(scheduler: Scheduler, agentManager: AgentManag
     const body = await c.req.json<Partial<{
       prompt: string
       scheduleValue: string
+      scheduleType: string
       status: string
+      name: string
+      description: string
     }>>()
 
     const updates: Parameters<typeof updateTask>[1] = {}
     if (body.prompt !== undefined) updates.prompt = body.prompt
     if (body.status !== undefined) updates.status = body.status
-    if (body.scheduleValue !== undefined) {
-      updates.scheduleValue = body.scheduleValue
+    if (body.name !== undefined) updates.name = body.name
+    if (body.description !== undefined) updates.description = body.description
+    if (body.scheduleValue !== undefined || body.scheduleType !== undefined) {
+      if (body.scheduleValue !== undefined) updates.scheduleValue = body.scheduleValue
       // 重新计算 nextRun
+      const scheduleType = body.scheduleType ?? existing.schedule_type
+      const scheduleValue = body.scheduleValue ?? existing.schedule_value
       const nextRun = scheduler.calculateNextRun({
-        schedule_type: existing.schedule_type,
-        schedule_value: body.scheduleValue,
+        schedule_type: scheduleType,
+        schedule_value: scheduleValue,
         last_run: existing.last_run,
       })
       updates.nextRun = nextRun
@@ -104,6 +117,38 @@ export function createTasksRoutes(scheduler: Scheduler, agentManager: AgentManag
     updateTask(id, updates)
     const updated = getTask(id)
     return c.json(updated)
+  })
+
+  // POST /api/tasks/:id/clone — 克隆任务
+  app.post('/tasks/:id/clone', async (c) => {
+    const id = c.req.param('id')
+    const existing = getTask(id)
+    if (!existing) {
+      return c.json({ error: 'Task not found' }, 404)
+    }
+
+    const newId = crypto.randomUUID()
+    const chatId = `task:${newId.slice(0, 8)}`
+    const nextRun = scheduler.calculateNextRun({
+      schedule_type: existing.schedule_type,
+      schedule_value: existing.schedule_value,
+      last_run: null,
+    })
+
+    createTask({
+      id: newId,
+      agentId: existing.agent_id,
+      chatId,
+      prompt: existing.prompt,
+      scheduleType: existing.schedule_type,
+      scheduleValue: existing.schedule_value,
+      nextRun: nextRun ?? new Date().toISOString(),
+      name: existing.name ? `${existing.name} (copy)` : undefined,
+      description: existing.description ?? undefined,
+    })
+
+    const task = getTask(newId)
+    return c.json(task, 201)
   })
 
   // DELETE /api/tasks/:id — 删除任务
@@ -126,8 +171,35 @@ export function createTasksRoutes(scheduler: Scheduler, agentManager: AgentManag
       return c.json({ error: 'Task not found' }, 404)
     }
 
+    const runAt = new Date().toISOString()
     try {
       const result = await agentQueue.enqueue(task.agent_id, task.chat_id, task.prompt)
+
+      // 保存执行结果到 messages 表
+      const timestamp = new Date().toISOString()
+      saveMessage({
+        id: `${task.id}-${runAt}-user`,
+        chatId: task.chat_id,
+        sender: 'manual',
+        senderName: 'Manual Run',
+        content: task.prompt,
+        timestamp: runAt,
+        isFromMe: true,
+        isBotMessage: false,
+      })
+      saveMessage({
+        id: `${task.id}-${runAt}-bot`,
+        chatId: task.chat_id,
+        sender: task.agent_id,
+        senderName: task.agent_id,
+        content: result ?? '(no output)',
+        timestamp,
+        isFromMe: false,
+        isBotMessage: true,
+      })
+      const taskName = (task as any).name || task.prompt.slice(0, 30)
+      upsertChat(task.chat_id, task.agent_id, `Task: ${taskName}`, 'task')
+
       return c.json({ status: 'success', result })
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err)
