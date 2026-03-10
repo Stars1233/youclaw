@@ -169,17 +169,31 @@ export class AgentManager {
       prompt += '\n\n' + envPrompt
     }
 
-    // 注入合格 skills 的内容
+    // 注入合格 skills 的内容（应用 prompt 限制）
     if (this.skillsLoader && agentConfig) {
-      const skills = this.skillsLoader.loadSkillsForAgent(agentConfig)
-      const eligibleSkills = skills.filter((s) => s.eligible)
+      prompt += this.buildSkillsPrompt(agentConfig)
+    }
 
-      if (eligibleSkills.length > 0) {
-        prompt += '\n\n## Skills\n'
-        for (const skill of eligibleSkills) {
-          prompt += `\n### ${skill.name}\n${skill.content}\n`
-        }
-      }
+    return prompt
+  }
+
+  /**
+   * 构建 skills 提示词片段，应用 prompt 限制
+   */
+  private buildSkillsPrompt(agentConfig: AgentConfig): string {
+    if (!this.skillsLoader) return ''
+
+    const skills = this.skillsLoader.loadSkillsForAgent(agentConfig)
+    const eligibleSkills = skills.filter((s) => s.eligible)
+
+    if (eligibleSkills.length === 0) return ''
+
+    // 应用 prompt 限制（截断、数量、总字符）
+    const limited = this.skillsLoader.applyPromptLimits(eligibleSkills)
+
+    let prompt = '\n\n## Skills\n'
+    for (const skill of limited) {
+      prompt += `\n### ${skill.name}\n${skill.content}\n`
     }
 
     return prompt
