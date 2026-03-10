@@ -4,7 +4,7 @@ import { initDatabase, createTask, updateTask, deleteTask, getTasks, getTask } f
 import { EventBus } from './events/index.ts'
 import { AgentManager, AgentQueue } from './agent/index.ts'
 import { MessageRouter, TelegramChannel } from './channel/index.ts'
-import { SkillsLoader } from './skills/index.ts'
+import { SkillsLoader, SkillsWatcher } from './skills/index.ts'
 import { MemoryManager } from './memory/index.ts'
 import { Scheduler } from './scheduler/index.ts'
 import { IpcWatcher, writeTasksSnapshot } from './ipc/index.ts'
@@ -25,9 +25,16 @@ async function main() {
   // 4. 创建 EventBus
   const eventBus = new EventBus()
 
-  // 5. 创建 SkillsLoader
+  // 5. 创建 SkillsLoader 和 SkillsWatcher
   const skillsLoader = new SkillsLoader()
   logger.info({ count: skillsLoader.loadAllSkills().length }, 'Skills 加载完成')
+
+  const skillsWatcher = new SkillsWatcher(skillsLoader, {
+    onReload: (skills) => {
+      logger.info({ count: skills.length }, 'Skills 热更新完成')
+    },
+  })
+  skillsWatcher.start()
 
   // 6. 创建 MemoryManager
   const memoryManager = new MemoryManager()
@@ -158,6 +165,7 @@ async function main() {
   // 14. 优雅关闭
   const shutdown = () => {
     logger.info('正在关闭...')
+    skillsWatcher.stop()
     ipcWatcher.stop()
     scheduler.stop()
     server.stop()
