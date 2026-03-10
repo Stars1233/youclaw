@@ -17,7 +17,6 @@ import {
   Copy,
   Check,
   Square,
-  Wrench,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useI18n } from '../i18n'
@@ -141,27 +140,164 @@ export function Chat() {
 
   const agentName = (id: string) => agents.find((a) => a.id === id)?.name ?? id
 
-  // 当前是否为新对话（右面板显示欢迎页）
+  // 当前是否为新对话
   const isNewChat = !chatId && messages.length === 0
 
   return (
     <TooltipProvider>
       <div className="flex h-full">
-        {/* 左面板 — 对话列表 */}
-        <div className="w-72 flex-shrink-0 border-r border-border flex flex-col bg-[var(--card)]/30 overflow-hidden">
+        {/* 左面板 — 消息区或新建欢迎页 */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {isNewChat ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-4">
+              <div className="max-w-xl w-full space-y-6">
+                <div className="text-center space-y-3">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--primary)]/10 to-[var(--primary)]/5 mb-2">
+                    <Sparkles className="h-7 w-7 text-[var(--primary)] opacity-80" />
+                  </div>
+                  <h1 className="text-2xl font-semibold">{t.chat.startConversation}</h1>
+                  <p className="text-sm text-[var(--muted-foreground)]">{t.chat.startHint}</p>
+                </div>
+
+                {agents.length > 1 && (
+                  <div className="flex justify-center gap-2">
+                    {agents.map((agent) => (
+                      <Button
+                        key={agent.id}
+                        variant={agentId === agent.id ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setAgentId(agent.id)}
+                        className="gap-1.5"
+                      >
+                        <Bot className="h-3.5 w-3.5" />
+                        {agent.name}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="relative">
+                  <Textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t.chat.placeholder}
+                    rows={3}
+                    className="pr-14 resize-none bg-[var(--card)] text-sm rounded-xl shadow-sm"
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        className="absolute right-2.5 bottom-2.5 h-8 w-8 rounded-lg"
+                        onClick={handleSend}
+                        disabled={!input.trim() || isProcessing}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Send (Enter)</TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <ScrollArea className="flex-1">
+                <div className="max-w-3xl mx-auto px-4 py-6 space-y-1">
+                  {messages.map((msg) => (
+                    <MessageBubble key={msg.id} message={msg} t={t} />
+                  ))}
+
+                  {streamingText && (
+                    <div className="flex gap-3 py-3">
+                      <Avatar className="h-8 w-8 mt-0.5">
+                        <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
+                          AI
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-[var(--muted-foreground)] mb-1.5">{t.chat.assistant}</div>
+                        <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:rounded-xl prose-pre:bg-[var(--secondary)] prose-code:before:content-none prose-code:after:content-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
+                          <span className="inline-block w-1.5 h-4 bg-[var(--primary)]/60 animate-pulse ml-0.5 rounded-sm" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {isProcessing && !streamingText && (
+                    <div className="flex gap-3 py-3">
+                      <Avatar className="h-8 w-8 mt-0.5">
+                        <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
+                          AI
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex items-center gap-2 text-[var(--muted-foreground)] text-sm pt-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t.chat.thinking}
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
+
+              <div className="border-t border-border bg-[var(--background)]">
+                <div className="max-w-3xl mx-auto px-4 py-3">
+                  <div className="relative flex items-end gap-2">
+                    <Textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={t.chat.placeholder}
+                      rows={1}
+                      className="resize-none bg-[var(--card)] text-sm rounded-xl pr-14 min-h-[42px]"
+                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          className="absolute right-2 bottom-1.5 h-8 w-8 rounded-lg"
+                          onClick={handleSend}
+                          disabled={!input.trim() || isProcessing}
+                        >
+                          {isProcessing ? (
+                            <Square className="h-3.5 w-3.5" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {isProcessing ? t.chat.stopGenerating : 'Send (Enter)'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 右面板 — 对话列表 */}
+        <div className="w-72 flex-shrink-0 border-l border-border flex flex-col overflow-hidden">
           {/* 顶部操作栏 */}
           <div className="p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">{t.nav.chat}</h2>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <h2 className="text-sm font-semibold truncate">{t.nav.chat}</h2>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
                   {chatList.length}
                 </Badge>
               </div>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNewChat}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={handleNewChat}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
@@ -209,14 +345,14 @@ export function Chat() {
                         )}
                       >
                         <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
-                        <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex-1 min-w-0">
                           <p className="text-sm truncate">{chat.name || chat.chat_id}</p>
                           <p className="text-[10px] opacity-60 truncate">{agentName(chat.agent_id)}</p>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[var(--background)] transition-opacity"
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[var(--background)] transition-opacity shrink-0"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <MoreHorizontal className="h-3.5 w-3.5" />
@@ -239,152 +375,6 @@ export function Chat() {
               </div>
             )}
           </ScrollArea>
-        </div>
-
-        {/* 右面板 — 消息区或新建 */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {isNewChat ? (
-            /* 新建对话 — 居中欢迎页 */
-            <div className="flex-1 flex flex-col items-center justify-center px-4">
-              <div className="max-w-xl w-full space-y-6">
-                {/* 欢迎区域 */}
-                <div className="text-center space-y-3">
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--primary)]/10 to-[var(--primary)]/5 mb-2">
-                    <Sparkles className="h-7 w-7 text-[var(--primary)] opacity-80" />
-                  </div>
-                  <h1 className="text-2xl font-semibold">{t.chat.startConversation}</h1>
-                  <p className="text-sm text-[var(--muted-foreground)]">{t.chat.startHint}</p>
-                </div>
-
-                {/* Agent 选择器 */}
-                {agents.length > 1 && (
-                  <div className="flex justify-center gap-2">
-                    {agents.map((agent) => (
-                      <Button
-                        key={agent.id}
-                        variant={agentId === agent.id ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setAgentId(agent.id)}
-                        className="gap-1.5"
-                      >
-                        <Bot className="h-3.5 w-3.5" />
-                        {agent.name}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-
-                {/* 输入框 */}
-                <div className="relative">
-                  <Textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={t.chat.placeholder}
-                    rows={3}
-                    className="pr-14 resize-none bg-[var(--card)] text-sm rounded-xl shadow-sm"
-                  />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        className="absolute right-2.5 bottom-2.5 h-8 w-8 rounded-lg"
-                        onClick={handleSend}
-                        disabled={!input.trim() || isProcessing}
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Send (Enter)</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* 已有对话 — 消息列表 + 底部输入 */
-            <>
-              {/* 消息列表 */}
-              <ScrollArea className="flex-1">
-                <div className="max-w-3xl mx-auto px-4 py-6 space-y-1">
-                  {messages.map((msg) => (
-                    <MessageBubble key={msg.id} message={msg} t={t} />
-                  ))}
-
-                  {/* 流式输出 */}
-                  {streamingText && (
-                    <div className="flex gap-3 py-3">
-                      <Avatar className="h-8 w-8 mt-0.5">
-                        <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
-                          AI
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-[var(--muted-foreground)] mb-1.5">{t.chat.assistant}</div>
-                        <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:rounded-xl prose-pre:bg-[var(--secondary)] prose-code:before:content-none prose-code:after:content-none">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
-                          <span className="inline-block w-1.5 h-4 bg-[var(--primary)]/60 animate-pulse ml-0.5 rounded-sm" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 处理中指示器 */}
-                  {isProcessing && !streamingText && (
-                    <div className="flex gap-3 py-3">
-                      <Avatar className="h-8 w-8 mt-0.5">
-                        <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
-                          AI
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex items-center gap-2 text-[var(--muted-foreground)] text-sm pt-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t.chat.thinking}
-                      </div>
-                    </div>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
-
-              {/* 底部输入框 */}
-              <div className="border-t border-border bg-[var(--background)]">
-                <div className="max-w-3xl mx-auto px-4 py-3">
-                  <div className="relative flex items-end gap-2">
-                    <Textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={t.chat.placeholder}
-                      rows={1}
-                      className="resize-none bg-[var(--card)] text-sm rounded-xl pr-14 min-h-[42px]"
-                    />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon"
-                          className="absolute right-2 bottom-1.5 h-8 w-8 rounded-lg"
-                          onClick={handleSend}
-                          disabled={!input.trim() || isProcessing}
-                        >
-                          {isProcessing ? (
-                            <Square className="h-3.5 w-3.5" />
-                          ) : (
-                            <Send className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isProcessing ? t.chat.stopGenerating : 'Send (Enter)'}
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </div>
     </TooltipProvider>
@@ -437,12 +427,7 @@ function MessageBubble({ message, t }: { message: Message; t: any }) {
                     <div className="relative group/code">
                       <pre {...props}>{children}</pre>
                       <button
-                        onClick={() => {
-                          // 从 pre > code 中提取文本
-                          const el = (props as any).node
-                          const text = message.content
-                          handleCopy(text)
-                        }}
+                        onClick={() => handleCopy(message.content)}
                         className="absolute top-2 right-2 p-1.5 rounded-md bg-[var(--background)]/80 opacity-0 group-hover/code:opacity-100 transition-opacity"
                       >
                         {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
@@ -452,7 +437,6 @@ function MessageBubble({ message, t }: { message: Message; t: any }) {
                 }}
               >{message.content}</ReactMarkdown>
             </div>
-            {/* 消息操作 */}
             <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Tooltip>
                 <TooltipTrigger asChild>
