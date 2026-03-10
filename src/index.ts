@@ -1,12 +1,13 @@
 import { loadEnv, getEnv } from './config/index.ts'
 import { initLogger, getLogger } from './logger/index.ts'
-import { initDatabase } from './db/index.ts'
+import { initDatabase, createTask, updateTask, deleteTask, getTasks, getTask } from './db/index.ts'
 import { EventBus } from './events/index.ts'
 import { AgentManager, AgentQueue } from './agent/index.ts'
 import { MessageRouter, TelegramChannel } from './channel/index.ts'
 import { SkillsLoader } from './skills/index.ts'
 import { MemoryManager } from './memory/index.ts'
 import { Scheduler } from './scheduler/index.ts'
+import { IpcWatcher, writeTasksSnapshot } from './ipc/index.ts'
 import { createApp } from './routes/index.ts'
 
 async function main() {
@@ -61,7 +62,87 @@ async function main() {
   scheduler.start()
   logger.info('定时任务调度器已启动')
 
-  // 12. 创建 HTTP 服务
+  // 12. 创建 IPC Watcher 并启动
+  const ipcWatcher = new IpcWatcher({
+    onScheduleTask: (data) => {
+      const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const nextRun = scheduler.calculateNextRun({
+        schedule_type: data.scheduleType,
+        schedule_value: data.scheduleValue,
+        last_run: null,
+      })
+
+      createTask({
+        id: taskId,
+        agentId: data.agentId,
+        chatId: data.chatId,
+        prompt: data.prompt,
+        scheduleType: data.scheduleType,
+        scheduleValue: data.scheduleValue,
+        nextRun: nextRun ?? new Date().toISOString(),
+      })
+
+      // 写入快照
+      refreshTasksSnapshot(data.agentId)
+      logger.info({ taskId, agentId: data.agentId, scheduleType: data.scheduleType }, 'IPC: 定时任务已创建')
+    },
+    onPauseTask: (taskId) => {
+      const task = getTask(taskId)
+      if (task) {
+        updateTask(taskId, { status: 'paused' })
+        refreshTasksSnapshot(task.agent_id)
+        logger.info({ taskId }, 'IPC: 定时任务已暂停')
+      } else {
+        logger.warn({ taskId }, 'IPC: 暂停失败，任务不存在')
+      }
+    },
+    onResumeTask: (taskId) => {
+      const task = getTask(taskId)
+      if (task) {
+        const nextRun = scheduler.calculateNextRun({
+          schedule_type: task.schedule_type,
+          schedule_value: task.schedule_value,
+          last_run: task.last_run,
+        })
+        updateTask(taskId, { status: 'active', nextRun: nextRun ?? new Date().toISOString() })
+        refreshTasksSnapshot(task.agent_id)
+        logger.info({ taskId }, 'IPC: 定时任务已恢复')
+      } else {
+        logger.warn({ taskId }, 'IPC: 恢复失败，任务不存在')
+      }
+    },
+    onCancelTask: (taskId) => {
+      const task = getTask(taskId)
+      if (task) {
+        deleteTask(taskId)
+        refreshTasksSnapshot(task.agent_id)
+        logger.info({ taskId }, 'IPC: 定时任务已取消')
+      } else {
+        logger.warn({ taskId }, 'IPC: 取消失败，任务不存在')
+      }
+    },
+  })
+  ipcWatcher.start()
+  logger.info('IPC Watcher 已启动')
+
+  /** 刷新指定 agent 的任务快照 */
+  function refreshTasksSnapshot(agentId: string) {
+    const allTasks = getTasks()
+    const agentTasks = allTasks
+      .filter((t) => t.agent_id === agentId)
+      .map((t) => ({
+        id: t.id,
+        prompt: t.prompt,
+        schedule_type: t.schedule_type,
+        schedule_value: t.schedule_value,
+        status: t.status,
+        next_run: t.next_run,
+        last_run: t.last_run,
+      }))
+    writeTasksSnapshot(agentId, agentTasks)
+  }
+
+  // 13. 创建 HTTP 服务
   const app = createApp({ agentManager, agentQueue, eventBus, router, skillsLoader, memoryManager, scheduler })
 
   const server = Bun.serve({
@@ -72,9 +153,10 @@ async function main() {
   logger.info({ port: env.PORT }, `HTTP 服务已启动: http://localhost:${env.PORT}`)
   logger.info('ZoerClaw 已就绪')
 
-  // 13. 优雅关闭
+  // 14. 优雅关闭
   const shutdown = () => {
     logger.info('正在关闭...')
+    ipcWatcher.stop()
     scheduler.stop()
     server.stop()
     process.exit(0)

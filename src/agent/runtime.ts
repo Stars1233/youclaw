@@ -39,12 +39,15 @@ export class AgentRuntime {
       let fullText = ''
       let sessionId = existingSessionId ?? ''
 
+      // 注入当前上下文到系统提示词（Agent 创建定时任务时需要这些信息）
+      const contextualPrompt = this.systemPrompt + `\n\n## Current Context\n- Agent ID: ${agentId}\n- Chat ID: ${chatId}\n- IPC Directory: ./data/ipc/${agentId}/tasks/\n`
+
       const q = query({
         prompt,
         options: {
           model: env.AGENT_MODEL,
           cwd: this.config.workspaceDir,
-          systemPrompt: this.systemPrompt,
+          systemPrompt: contextualPrompt,
           abortController,
           permissionMode: 'bypassPermissions',
           allowDangerouslySkipPermissions: true,
