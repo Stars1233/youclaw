@@ -1,6 +1,6 @@
 import { Cron } from 'croner'
 import { getLogger } from '../logger/index.ts'
-import { getTasksDueBy, updateTask, saveTaskRunLog } from '../db/index.ts'
+import { getTasksDueBy, updateTask, saveTaskRunLog, saveMessage, upsertChat } from '../db/index.ts'
 import type { ScheduledTask } from '../db/index.ts'
 import type { AgentQueue } from '../agent/queue.ts'
 import type { AgentManager } from '../agent/manager.ts'
@@ -74,6 +74,38 @@ export class Scheduler {
         status: 'success',
         result,
       })
+
+      // 保存执行结果到 messages 表，使 Chat 页面可见
+      const timestamp = new Date().toISOString()
+      const taskChatId = task.chat_id
+
+      // 保存用户 prompt 消息
+      saveMessage({
+        id: `${task.id}-${runAt}-user`,
+        chatId: taskChatId,
+        sender: 'scheduler',
+        senderName: 'Scheduled Task',
+        content: task.prompt,
+        timestamp: runAt,
+        isFromMe: true,
+        isBotMessage: false,
+      })
+
+      // 保存 bot 结果消息
+      saveMessage({
+        id: `${task.id}-${runAt}-bot`,
+        chatId: taskChatId,
+        sender: task.agent_id,
+        senderName: task.agent_id,
+        content: result ?? '(no output)',
+        timestamp,
+        isFromMe: false,
+        isBotMessage: true,
+      })
+
+      // 更新 chat 记录
+      const taskName = (task as any).name || task.prompt.slice(0, 30)
+      upsertChat(taskChatId, task.agent_id, `Task: ${taskName}`, 'task')
 
       // 计算下次运行时间
       const nextRun = this.calculateNextRun(task)
