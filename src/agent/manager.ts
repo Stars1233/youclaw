@@ -4,23 +4,24 @@ import { parse as parseYaml } from 'yaml'
 import { getPaths } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
 import type { EventBus } from '../events/index.ts'
-import type { SkillsLoader } from '../skills/index.ts'
+import { AgentConfigSchema } from './schema.ts'
 import { AgentRuntime } from './runtime.ts'
-import type { AgentConfig, ManagedAgent } from './types.ts'
+import { PromptBuilder } from './prompt-builder.ts'
+import type { AgentConfig, AgentInstance } from './types.ts'
 
 export class AgentManager {
-  private agents: Map<string, ManagedAgent> = new Map()
+  private agents: Map<string, AgentInstance> = new Map()
   private eventBus: EventBus
-  private skillsLoader: SkillsLoader | null
+  private promptBuilder: PromptBuilder
 
-  constructor(eventBus: EventBus, skillsLoader?: SkillsLoader) {
+  constructor(eventBus: EventBus, promptBuilder: PromptBuilder) {
     this.eventBus = eventBus
-    this.skillsLoader = skillsLoader ?? null
+    this.promptBuilder = promptBuilder
   }
 
   /**
    * 从 agents/ 目录加载所有 agent
-   * 扫描每个子目录的 agent.yaml，解析配置并创建 AgentRuntime
+   * 扫描每个子目录的 agent.yaml，使用 Zod 校验配置并创建 AgentRuntime
    */
   async loadAgents(): Promise<void> {
     const logger = getLogger()
@@ -49,27 +50,36 @@ export class AgentManager {
         const rawYaml = readFileSync(configPath, 'utf-8')
         const parsed = parseYaml(rawYaml) as Record<string, unknown>
 
-        const config: AgentConfig = {
-          id: String(parsed.id ?? entry.name),
-          name: String(parsed.name ?? entry.name),
-          model: String(parsed.model ?? 'claude-sonnet-4-6'),
-          workspaceDir: agentDir,
-          trigger: parsed.trigger != null ? String(parsed.trigger) : undefined,
-          requiresTrigger: parsed.requiresTrigger != null ? Boolean(parsed.requiresTrigger) : undefined,
-          telegram: parsed.telegram != null ? this.parseTelegramConfig(parsed.telegram) : undefined,
-          memory: parsed.memory != null ? { enabled: Boolean((parsed.memory as Record<string, unknown>).enabled) } : undefined,
-          skills: Array.isArray(parsed.skills) ? (parsed.skills as unknown[]).map(String) : undefined,
+        // 使用 Zod 校验配置
+        const result = AgentConfigSchema.safeParse({
+          ...parsed,
+          id: parsed.id ?? entry.name,
+          name: parsed.name ?? entry.name,
+        })
+
+        if (!result.success) {
+          logger.error({ agentDir, errors: result.error.issues }, 'agent.yaml 配置校验失败')
+          continue
         }
 
-        const systemPrompt = this.buildSystemPrompt(agentDir, config)
-        const runtime = new AgentRuntime(config, this.eventBus, systemPrompt)
+        const config: AgentConfig = {
+          ...result.data,
+          workspaceDir: agentDir,
+        }
+
+        const runtime = new AgentRuntime(config, this.eventBus, this.promptBuilder)
 
         this.agents.set(config.id, {
           config,
+          workspaceDir: agentDir,
           runtime,
           state: {
             sessionId: null,
             isProcessing: false,
+            lastProcessedAt: null,
+            totalProcessed: 0,
+            lastError: null,
+            queueDepth: 0,
           },
         })
 
@@ -83,26 +93,25 @@ export class AgentManager {
   }
 
   /**
-   * 根据 chatId 找到对应的 agent
-   * 1. 遍历所有 agent 的 telegram.chatIds，找到匹配的
-   * 2. 如果 chatId 以 "web:" 开头，返回默认 agent
-   * 3. 如果没找到，返回 undefined
+   * 清空已加载的 agent 并重新从磁盘加载
    */
-  resolveAgent(chatId: string): ManagedAgent | undefined {
-    // 遍历所有 agent，检查 telegram.chatIds 绑定
+  async reloadAgents(): Promise<void> {
+    this.agents.clear()
+    await this.loadAgents()
+  }
+
+  /**
+   * 根据 chatId 找到对应的 agent
+   */
+  resolveAgent(chatId: string): AgentInstance | undefined {
     for (const managed of this.agents.values()) {
       const chatIds = managed.config.telegram?.chatIds
       if (chatIds && chatIds.includes(chatId)) {
         return managed
       }
     }
-
-    // web 渠道返回默认 agent
-    if (chatId.startsWith('web:')) {
-      return this.getDefaultAgent()
-    }
-
-    return undefined
+    // web / telegram 未精确匹配时，fallback 到默认 agent
+    return this.getDefaultAgent()
   }
 
   /**
@@ -115,87 +124,17 @@ export class AgentManager {
   /**
    * 获取单个 agent
    */
-  getAgent(agentId: string): ManagedAgent | undefined {
+  getAgent(agentId: string): AgentInstance | undefined {
     return this.agents.get(agentId)
   }
 
   /**
-   * 获取默认 agent（第一个加载的）
+   * 获取默认 agent
    */
-  getDefaultAgent(): ManagedAgent | undefined {
-    // 优先返回 id 为 "default" 的 agent
+  getDefaultAgent(): AgentInstance | undefined {
     const defaultAgent = this.agents.get('default')
     if (defaultAgent) return defaultAgent
-
-    // 否则返回第一个
     const first = this.agents.values().next()
     return first.done ? undefined : first.value
-  }
-
-  /**
-   * 解析 telegram 配置
-   */
-  private parseTelegramConfig(raw: unknown): { chatIds?: string[] } | undefined {
-    if (typeof raw !== 'object' || raw === null) return undefined
-    const obj = raw as Record<string, unknown>
-    return {
-      chatIds: Array.isArray(obj.chatIds) ? (obj.chatIds as unknown[]).map(String) : undefined,
-    }
-  }
-
-  /**
-   * 构建 agent 的系统提示词
-   * 读取 prompts/system.md + prompts/env.md + 合格 skills 内容
-   */
-  private buildSystemPrompt(_agentDir: string, agentConfig?: AgentConfig): string {
-    const promptsDir = getPaths().prompts
-    let prompt = ''
-
-    // 加载基础系统提示词
-    const systemPath = resolve(promptsDir, 'system.md')
-    if (existsSync(systemPath)) {
-      prompt += readFileSync(systemPath, 'utf-8')
-    }
-
-    // 加载并填充环境上下文
-    const envPath = resolve(promptsDir, 'env.md')
-    if (existsSync(envPath)) {
-      let envPrompt = readFileSync(envPath, 'utf-8')
-      envPrompt = envPrompt
-        .replace('{{date}}', new Date().toISOString().split('T')[0]!)
-        .replace('{{os}}', process.platform)
-        .replace('{{platform}}', process.arch)
-        .replace('{{cwd}}', process.cwd())
-      prompt += '\n\n' + envPrompt
-    }
-
-    // 注入合格 skills 的内容（应用 prompt 限制）
-    if (this.skillsLoader && agentConfig) {
-      prompt += this.buildSkillsPrompt(agentConfig)
-    }
-
-    return prompt
-  }
-
-  /**
-   * 构建 skills 提示词片段，应用 prompt 限制
-   */
-  private buildSkillsPrompt(agentConfig: AgentConfig): string {
-    if (!this.skillsLoader) return ''
-
-    const skills = this.skillsLoader.loadSkillsForAgent(agentConfig)
-    const eligibleSkills = skills.filter((s) => s.eligible)
-
-    if (eligibleSkills.length === 0) return ''
-
-    // 应用 prompt 限制（截断、数量、总字符）
-    const limited = this.skillsLoader.applyPromptLimits(eligibleSkills)
-
-    let prompt = '\n\n## Skills\n'
-    for (const skill of limited) {
-      prompt += `\n### ${skill.name}\n${skill.content}\n`
-    }
-
-    return prompt
   }
 }
