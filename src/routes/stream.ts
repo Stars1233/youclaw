@@ -10,11 +10,14 @@ export function createStreamRoutes(eventBus: EventBus) {
     const chatId = c.req.param('chatId')
 
     return streamSSE(c, async (sse) => {
+      // 使用写入队列确保 SSE 事件按序发送，避免并发写入丢失
+      let writeQueue = Promise.resolve()
+      const enqueueWrite = (event: string, data: string) => {
+        writeQueue = writeQueue.then(() => sse.writeSSE({ event, data })).catch(() => {})
+      }
+
       const unsubscribe = eventBus.subscribe({ chatId }, (event) => {
-        sse.writeSSE({
-          event: event.type,
-          data: JSON.stringify(event),
-        })
+        enqueueWrite(event.type, JSON.stringify(event))
       })
 
       // 发送连接确认
@@ -38,11 +41,13 @@ export function createStreamRoutes(eventBus: EventBus) {
   // GET /api/stream/system — 订阅系统级事件
   stream.get('/stream/system', (c) => {
     return streamSSE(c, async (sse) => {
+      let writeQueue = Promise.resolve()
+      const enqueueWrite = (event: string, data: string) => {
+        writeQueue = writeQueue.then(() => sse.writeSSE({ event, data })).catch(() => {})
+      }
+
       const unsubscribe = eventBus.subscribe({}, (event) => {
-        sse.writeSSE({
-          event: event.type,
-          data: JSON.stringify(event),
-        })
+        enqueueWrite(event.type, JSON.stringify(event))
       })
 
       await sse.writeSSE({
