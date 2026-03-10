@@ -8,3 +8,25 @@ model: "claude-sonnet-4-6"
 #     - "tg:123456789"
 # memory:
 #   enabled: true
+
+# --- Phase 3: 多 Agent 协作 ---
+# agents:
+#   researcher:
+#     description: "搜索网络并分析信息"
+#     prompt: "You are a research specialist..."
+#     tools: ["WebSearch", "WebFetch", "Read"]
+#     model: sonnet
+#     maxTurns: 30
+
+# --- Phase 4: Agent 能力增强 ---
+# maxConcurrency: 1
+# allowedTools: ["Bash", "Read", "Write", "Edit", "Task", "TaskOutput"]
+# disallowedTools: ["TodoWrite"]
+# maxTurns: 100
+# effort: "high"
+# mcpServers:
+#   my-tools:
+#     command: "bun"
+#     args: ["./tools/server.ts"]
+#     env:
+#       API_KEY: "${CUSTOM_API_KEY}"
