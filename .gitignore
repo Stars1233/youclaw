@@ -38,3 +38,6 @@ data/
 
 # Agent memory logs (keep MEMORY.md template)
 agents/*/memory/logs/
+
+
+plans/
