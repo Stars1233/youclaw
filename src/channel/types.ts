@@ -6,6 +6,7 @@ export interface InboundMessage {
   content: string
   timestamp: string
   isGroup: boolean
+  requestedSkills?: string[]  // 显式请求的 skills
 }
 
 export interface Channel {

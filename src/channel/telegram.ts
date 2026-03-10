@@ -46,8 +46,13 @@ export class TelegramChannel implements Channel {
 
     // 文本消息处理
     this.bot.on('message:text', async (ctx) => {
-      // 跳过 / 开头的命令
-      if (ctx.message.text.startsWith('/')) return
+      // 只拦截已注册的 Telegram 内建命令，其余 / 消息放行（可能是 skill 调用）
+      const builtinCommands = new Set(['chatid', 'ping'])
+      if (ctx.message.text.startsWith('/')) {
+        const firstWord = ctx.message.text.split(/\s/)[0]!
+        const cmd = firstWord.slice(1).toLowerCase().split('@')[0]! // 处理 /chatid@bot_name 格式
+        if (builtinCommands.has(cmd)) return
+      }
 
       const chatId = `tg:${ctx.chat.id}`
       let content = ctx.message.text

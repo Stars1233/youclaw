@@ -5,20 +5,27 @@ import { saveMessage, upsertChat } from '../db/index.ts'
 import { randomUUID } from 'node:crypto'
 import { getLogger } from '../logger/index.ts'
 import type { MemoryManager } from '../memory/index.ts'
+import type { SkillsLoader } from '../skills/index.ts'
+import { parseSkillInvocations } from '../skills/invoke.ts'
 import type { InboundMessage, Channel } from './types.ts'
 
 export class MessageRouter {
   private channels: Channel[] = []
   private memoryManager: MemoryManager | null = null
+  private skillsLoader: SkillsLoader | null = null
 
   constructor(
     private agentManager: AgentManager,
     private agentQueue: AgentQueue,
     private eventBus: EventBus,
     memoryManager?: MemoryManager,
+    skillsLoader?: SkillsLoader,
   ) {
     if (memoryManager) {
       this.memoryManager = memoryManager
+    }
+    if (skillsLoader) {
+      this.skillsLoader = skillsLoader
     }
     // 订阅 complete 事件，自动发送回复到对应 channel
     this.eventBus.subscribe({ types: ['complete'] }, (event) => {
@@ -53,6 +60,18 @@ export class MessageRouter {
       }
     }
 
+    // 解析 skill 调用（来自消息本身或已由上游解析）
+    let requestedSkills = message.requestedSkills ?? []
+    let contentForAgent = message.content
+
+    if (requestedSkills.length === 0 && this.skillsLoader) {
+      const allSkills = this.skillsLoader.loadAllSkills()
+      const knownNames = new Set(allSkills.map((s) => s.name))
+      const parsed = parseSkillInvocations(message.content, knownNames)
+      requestedSkills = parsed.requestedSkills
+      contentForAgent = parsed.cleanContent || message.content
+    }
+
     // 存入数据库
     upsertChat(message.chatId, config.id, message.senderName, message.chatId.startsWith('tg:') ? 'telegram' : 'web')
     saveMessage({
@@ -66,11 +85,16 @@ export class MessageRouter {
       isBotMessage: false,
     })
 
-    logger.info({ agentId: config.id, chatId: message.chatId }, '路由消息到 agent')
+    logger.info({ agentId: config.id, chatId: message.chatId, requestedSkills }, '路由消息到 agent')
 
-    // 入队处理
+    // 入队处理（传递 requestedSkills）
     try {
-      const reply = await this.agentQueue.enqueue(config.id, message.chatId, message.content)
+      const reply = await this.agentQueue.enqueue(
+        config.id,
+        message.chatId,
+        contentForAgent,
+        requestedSkills.length > 0 ? requestedSkills : undefined,
+      )
 
       // 存储 bot 回复
       saveMessage({
