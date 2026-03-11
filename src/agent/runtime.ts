@@ -5,7 +5,7 @@ import { getSession, saveSession } from '../db/index.ts'
 import type { EventBus } from '../events/index.ts'
 import type { PromptBuilder } from './prompt-builder.ts'
 import type { AgentConfig, ProcessParams } from './types.ts'
-import type { McpServerConfig } from './schema.ts'
+import { resolveMcpServers } from './mcp-utils.ts'
 
 export class AgentRuntime {
   private config: AgentConfig
@@ -116,7 +116,7 @@ export class AgentRuntime {
 
     // Phase 4: MCP 服务器（SDK 期望 Record<string, McpServerConfig> 对象格式）
     if (this.config.mcpServers) {
-      queryOptions.mcpServers = this.resolveMcpServers(this.config.mcpServers)
+      queryOptions.mcpServers = resolveMcpServers(this.config.mcpServers)
     }
 
     // Phase 4: 工具控制
@@ -266,33 +266,4 @@ export class AgentRuntime {
     })
   }
 
-  /**
-   * 解析 MCP 服务器配置中的环境变量引用（${VAR} → process.env.VAR）
-   */
-  private resolveMcpServers(servers: Record<string, McpServerConfig>): Record<string, McpServerConfig> {
-    const logger = getLogger()
-    const resolved: Record<string, McpServerConfig> = {}
-    for (const [name, server] of Object.entries(servers)) {
-      if (!server.env) {
-        resolved[name] = server
-        continue
-      }
-      const resolvedEnv: Record<string, string> = {}
-      for (const [key, value] of Object.entries(server.env)) {
-        const resolvedValue = value.replace(/\$\{(\w+)\}/g, (_, varName) => {
-          const envVal = process.env[varName]
-          if (!envVal) {
-            logger.warn({ mcpServer: name, envVar: varName }, 'MCP 服务器所需环境变量未定义，跳过该变量')
-          }
-          return envVal ?? ''
-        })
-        // 跳过解析后为空的环境变量，避免传空字符串导致 MCP 进程崩溃
-        if (resolvedValue) {
-          resolvedEnv[key] = resolvedValue
-        }
-      }
-      resolved[name] = { ...server, env: resolvedEnv }
-    }
-    return resolved
-  }
 }
