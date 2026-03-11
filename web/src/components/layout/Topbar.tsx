@@ -25,8 +25,8 @@ export function Topbar({ onOpenSettings }: TopbarProps) {
       className="h-12 border-b border-border flex items-center px-4 shrink-0"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      {/* macOS: 给交通灯按钮留出空间 */}
-      {isMac && <div className="w-16 shrink-0" />}
+      {/* macOS: 给交通灯按钮留出空间（x:16 + 按钮宽约70px） */}
+      {isMac && <div className="w-20 shrink-0" />}
 
       <div className="flex items-center gap-2">
         <Bot className="h-5 w-5 text-primary" />

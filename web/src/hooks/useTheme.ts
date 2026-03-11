@@ -6,14 +6,14 @@ export type Theme = "dark" | "light" | "system"
 const THEME_KEY = "youclaw-theme"
 
 export function applyThemeToDOM(theme: Theme): void {
-  const html = document.documentElement
+  const body = document.body
   if (theme === "system") {
     const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-    html.classList.toggle("dark", systemDark)
+    body.classList.toggle("dark", systemDark)
   } else if (theme === "dark") {
-    html.classList.add("dark")
+    body.classList.add("dark")
   } else {
-    html.classList.remove("dark")
+    body.classList.remove("dark")
   }
 }
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { applyThemeToDOM, getSavedTheme, saveTheme, type Theme } from "@/hooks/useTheme"
@@ -93,9 +92,9 @@ export function GeneralPanel() {
             >
               <RadioGroupItem value={option.value} />
               <div>
-                <Label className="text-sm font-medium cursor-pointer">
+                <span className="text-sm font-medium cursor-pointer">
                   {t.settings[option.labelKey]}
-                </Label>
+                </span>
                 <div className="text-xs text-muted-foreground">{t.settings[option.descKey]}</div>
               </div>
             </label>

@@ -22,6 +22,8 @@ asarUnpack:
   - "dist/src/**/*"
   - "**/*.node"
   - "**/better-sqlite3/**"
+  - "**/bindings/**"
+  - "**/file-uri-to-path/**"
   - "**/node_modules/@anthropic-ai/claude-agent-sdk/vendor/**"
 
 mac:

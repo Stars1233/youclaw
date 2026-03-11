@@ -25,8 +25,12 @@ console.log("Renderer output moved to dist/renderer/");
 console.log("Compiling backend TypeScript...");
 execSync("npx tsc -p tsconfig.build.json", { cwd: root, stdio: "inherit" });
 
-// 3. 编译 Electron TypeScript（electron/ → dist/electron/）
-console.log("Compiling Electron TypeScript...");
+// 3. 编译 Electron TypeScript（electron/main → dist/electron/main）
+console.log("Compiling Electron main process...");
 execSync("npx tsc -p electron/tsconfig.json", { cwd: root, stdio: "inherit" });
+
+// 4. 编译 Electron preload（CJS format，electron/preload → dist/electron/preload）
+console.log("Compiling Electron preload (CommonJS)...");
+execSync("npx tsc -p electron/preload/tsconfig.json", { cwd: root, stdio: "inherit" });
 
 console.log("Build complete.");

@@ -63,7 +63,8 @@ fs.renameSync(webDist, rendererDist);
 
 // 3. Compile TypeScript
 run("npx tsc -p tsconfig.build.json", "Compile backend");
-run("npx tsc -p electron/tsconfig.json", "Compile electron");
+run("npx tsc -p electron/tsconfig.json", "Compile electron main");
+run("npx tsc -p electron/preload/tsconfig.json", "Compile electron preload (CJS)");
 
 // 4. Start Electron
 run("npx electron .", "Start Electron");

@@ -24,14 +24,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[560px] max-h-[420px] p-0 flex overflow-hidden">
+      <DialogContent className="w-[640px] h-[520px] p-0 flex overflow-hidden bg-background">
         {/* 关闭按钮 */}
         <DialogClose className="absolute right-3 top-3 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
           <X size={16} />
         </DialogClose>
 
         {/* 侧边栏 */}
-        <div className="w-[160px] bg-muted/50 p-3 flex flex-col gap-1 border-r border-border">
+        <div className="w-[180px] bg-muted p-3 flex flex-col gap-1 border-r border-border">
           {tabs.map((tab) => (
             <button
               key={tab.id}
