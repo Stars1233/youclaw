@@ -76,5 +76,34 @@ export function createMemoryRoutes(memoryManager: MemoryManager, agentManager: A
     return c.json({ content })
   })
 
+  // ===== 对话存档 =====
+
+  // GET /api/agents/:id/memory/conversations — 存档列表
+  memory.get('/agents/:id/memory/conversations', (c) => {
+    const id = c.req.param('id')
+    const managed = agentManager.getAgent(id)
+
+    if (!managed) {
+      return c.json({ error: 'Agent not found' }, 404)
+    }
+
+    const archives = memoryManager.getConversationArchives(id)
+    return c.json(archives)
+  })
+
+  // GET /api/agents/:id/memory/conversations/:filename — 读取存档
+  memory.get('/agents/:id/memory/conversations/:filename', (c) => {
+    const id = c.req.param('id')
+    const filename = c.req.param('filename')
+    const managed = agentManager.getAgent(id)
+
+    if (!managed) {
+      return c.json({ error: 'Agent not found' }, 404)
+    }
+
+    const content = memoryManager.getConversationArchive(id, filename)
+    return c.json({ content })
+  })
+
   return memory
 }

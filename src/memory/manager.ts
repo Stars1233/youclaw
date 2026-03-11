@@ -26,10 +26,21 @@ export class MemoryManager {
     }
   }
 
+  private getConversationsDir(agentId: string): string {
+    return resolve(this.getAgentMemoryDir(agentId), 'conversations')
+  }
+
   private ensureLogsDir(agentId: string): void {
     const logsDir = this.getLogsDir(agentId)
     if (!existsSync(logsDir)) {
       mkdirSync(logsDir, { recursive: true })
+    }
+  }
+
+  private ensureConversationsDir(agentId: string): void {
+    const dir = this.getConversationsDir(agentId)
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true })
     }
   }
 
@@ -196,5 +207,47 @@ export class MemoryManager {
     parts.push('</memory>')
 
     return parts.join('\n')
+  }
+
+  // ===== 对话存档 =====
+
+  /**
+   * 获取对话存档列表
+   */
+  getConversationArchives(agentId: string): Array<{ filename: string; date: string }> {
+    const dir = this.getConversationsDir(agentId)
+    if (!existsSync(dir)) return []
+
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith('.md'))
+      .sort((a, b) => b.localeCompare(a))
+
+    return files.map((f) => {
+      const match = f.match(/^(\d{4}-\d{2}-\d{2})/)
+      return { filename: f, date: match ? match[1]! : '' }
+    })
+  }
+
+  /**
+   * 读取单个对话存档
+   */
+  getConversationArchive(agentId: string, filename: string): string {
+    // 安全检查：防止路径遍历
+    if (filename.includes('..') || filename.includes('/')) return ''
+
+    const filePath = resolve(this.getConversationsDir(agentId), filename)
+    if (!existsSync(filePath)) return ''
+
+    return readFileSync(filePath, 'utf-8')
+  }
+
+  /**
+   * 写入对话存档
+   */
+  saveConversationArchive(agentId: string, filename: string, content: string): void {
+    this.ensureConversationsDir(agentId)
+    const filePath = resolve(this.getConversationsDir(agentId), filename)
+    Bun.write(filePath, content)
+    getLogger().info({ agentId, filename }, '对话存档已保存')
   }
 }
