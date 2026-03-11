@@ -697,6 +697,7 @@ function SubAgentsSection({
           {t.agents.subAgents}
         </h2>
         <button
+          data-testid="subagent-add-btn"
           onClick={handleAdd}
           disabled={editingId === '__new__'}
           className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50"
@@ -715,7 +716,7 @@ function SubAgentsSection({
           const isExpanded = expandedId === id
           const isEditing = editingId === id
           return (
-            <div key={id} className="border border-border rounded-md overflow-hidden">
+            <div key={id} data-testid="subagent-item" className="border border-border rounded-md overflow-hidden">
               {/* 标题栏 */}
               <button
                 onClick={() => setExpandedId(isExpanded ? null : id)}
@@ -765,6 +766,7 @@ function SubAgentsSection({
                           {t.common.edit}
                         </button>
                         <button
+                          data-testid="subagent-delete-btn"
                           onClick={() => handleDelete(id)}
                           className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-destructive hover:bg-destructive/10 transition-colors"
                         >
@@ -806,6 +808,7 @@ function SubAgentsSection({
                   {t.common.cancel}
                 </button>
                 <button
+                  data-testid="subagent-save-btn"
                   onClick={handleSave}
                   disabled={isSaving || !newId.trim() || !editDraft.description.trim()}
                   className="flex items-center gap-1 px-3 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
@@ -819,6 +822,7 @@ function SubAgentsSection({
                 <div>
                   <label className="block text-xs font-medium mb-1">{t.agents.subAgentId}</label>
                   <input
+                    data-testid="subagent-input-id"
                     value={newId}
                     onChange={(e) => setNewId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder={t.agents.subAgentIdPlaceholder}
@@ -908,6 +912,7 @@ function SubAgentForm({
       <div>
         <label className="block text-xs font-medium mb-1">{t.agents.descriptionLabel}</label>
         <input
+          data-testid="subagent-input-desc"
           value={draft.description}
           onChange={(e) => setDraft({ ...draft, description: e.target.value })}
           placeholder={t.agents.descriptionPlaceholder}
