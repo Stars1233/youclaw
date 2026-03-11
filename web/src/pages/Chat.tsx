@@ -164,6 +164,7 @@ export function Chat() {
                     {agents.map((agent) => (
                       <Button
                         key={agent.id}
+                        data-testid={`chat-agent-${agent.id}`}
                         variant={agentId === agent.id ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setAgentId(agent.id)}
