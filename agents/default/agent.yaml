@@ -6,8 +6,11 @@ model: "claude-sonnet-4-6"
 # telegram:
 #   chatIds:
 #     - "tg:123456789"
-# memory:
-#   enabled: true
+memory:
+  enabled: true
+  recentDays: 3
+  archiveConversations: true
+  maxLogEntryLength: 500
 
 # --- Phase 3: 多 Agent 协作 ---
 # agents:
