@@ -28,6 +28,9 @@ export const AgentConfigSchema = z.object({
   }).optional(),
   memory: z.object({
     enabled: z.boolean().default(false),
+    recentDays: z.number().default(3),
+    archiveConversations: z.boolean().default(true),
+    maxLogEntryLength: z.number().default(500),
   }).optional(),
   skills: z.array(z.string()).optional(),
   maxConcurrency: z.number().default(1),

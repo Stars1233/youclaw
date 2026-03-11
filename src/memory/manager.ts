@@ -171,11 +171,11 @@ export class MemoryManager {
    * 获取记忆上下文（注入到系统提示词中）
    * 包含全局记忆、长期记忆和最近 3 天的日志摘要
    */
-  getMemoryContext(agentId: string): string {
+  getMemoryContext(agentId: string, recentDays: number = 3): string {
     const globalMemory = this.getGlobalMemory()
     const longTermMemory = this.getMemory(agentId)
     const dates = this.getDailyLogDates(agentId)
-    const recentDates = dates.slice(0, 3)
+    const recentDates = dates.slice(0, recentDays)
 
     let recentLogs = ''
     for (const date of recentDates) {
