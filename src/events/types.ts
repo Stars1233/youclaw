@@ -9,6 +9,9 @@ export type AgentEvent =
   | { type: 'subagent_started'; agentId: string; chatId: string; taskId: string; description: string }
   | { type: 'subagent_progress'; agentId: string; chatId: string; taskId: string; summary?: string }
   | { type: 'subagent_completed'; agentId: string; chatId: string; taskId: string; status: string; summary: string }
+  // Memory 事件
+  | { type: 'memory_updated'; agentId: string; filePath: string }
+  | { type: 'conversation_archived'; agentId: string; filename: string }
 
 export type AgentEventType = AgentEvent['type']
 

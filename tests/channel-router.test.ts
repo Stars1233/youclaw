@@ -90,8 +90,8 @@ describe('MessageRouter.handleInbound', () => {
     const enqueue = mock(() => Promise.resolve('router reply'))
     const appendDailyLog = mock(() => {})
     const loadAllSkills = mock(() => [
-      { name: 'pdf' },
-      { name: 'agent-browser' },
+      { name: 'pdf', usable: true },
+      { name: 'agent-browser', usable: true },
     ])
     const router = new MessageRouter(
       {
@@ -118,6 +118,7 @@ describe('MessageRouter.handleInbound', () => {
       'web:chat-1',
       '/pdf /agent-browser summarize report',
       'router reply',
+      undefined,
     )
 
     const chats = getChats()

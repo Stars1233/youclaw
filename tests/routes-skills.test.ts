@@ -18,6 +18,8 @@ const baseSkill = {
     env: { passed: true, results: [] },
   },
   loadedAt: 1,
+  enabled: true,
+  usable: true,
 }
 
 describe('skills routes', () => {
@@ -29,6 +31,7 @@ describe('skills routes', () => {
         getConfig: () => ({ maxSkillCount: 50 }),
         refresh: () => [baseSkill],
         loadSkillsForAgent: () => [baseSkill],
+        getAgentSkillsView: () => ({ available: [baseSkill], enabled: [baseSkill], eligible: [baseSkill] }),
       } as any,
       { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
     )
@@ -48,6 +51,7 @@ describe('skills routes', () => {
         getConfig: () => ({ maxSkillCount: 50, maxTotalChars: 30000 }),
         refresh: () => [baseSkill],
         loadSkillsForAgent: () => [baseSkill],
+        getAgentSkillsView: () => ({ available: [baseSkill], enabled: [baseSkill], eligible: [baseSkill] }),
       } as any,
       { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
     )
@@ -68,6 +72,7 @@ describe('skills routes', () => {
         getConfig: () => ({}),
         refresh: () => [baseSkill],
         loadSkillsForAgent: () => [baseSkill],
+        getAgentSkillsView: () => ({ available: [], enabled: [], eligible: [] }),
       } as any,
       { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
     )
@@ -77,7 +82,7 @@ describe('skills routes', () => {
     expect(res.status).toBe(404)
   })
 
-  test('GET /agents/:id/skills 在 agent 存在时返回其 skills', async () => {
+  test('GET /agents/:id/skills 在 agent 存在时返回其 skills 视图', async () => {
     const app = createSkillsRoutes(
       {
         loadAllSkills: () => [baseSkill],
@@ -85,6 +90,11 @@ describe('skills routes', () => {
         getConfig: () => ({}),
         refresh: () => [baseSkill],
         loadSkillsForAgent: () => [baseSkill],
+        getAgentSkillsView: () => ({
+          available: [baseSkill],
+          enabled: [baseSkill],
+          eligible: [baseSkill],
+        }),
       } as any,
       { getAgent: (id: string) => id === 'agent-1' ? { config: { id } } : undefined } as any,
     )
@@ -93,7 +103,79 @@ describe('skills routes', () => {
     const missing = await app.request('/agents/missing/skills')
 
     expect(ok.status).toBe(200)
-    expect((await ok.json() as Array<{ name: string }>)[0]?.name).toBe('pdf')
+    const body = await ok.json() as { available: Array<{ name: string }>; enabled: Array<{ name: string }>; eligible: Array<{ name: string }> }
+    expect(body.available[0]?.name).toBe('pdf')
+    expect(body.enabled[0]?.name).toBe('pdf')
+    expect(body.eligible[0]?.name).toBe('pdf')
     expect(missing.status).toBe(404)
+  })
+
+  test('POST /skills/:name/toggle 正常切换', async () => {
+    const disabledSkill = { ...baseSkill, enabled: false, usable: false }
+    const app = createSkillsRoutes(
+      {
+        loadAllSkills: () => [baseSkill],
+        getCacheStats: () => ({}),
+        getConfig: () => ({}),
+        refresh: () => [disabledSkill],
+        loadSkillsForAgent: () => [baseSkill],
+        setSkillEnabled: (_name: string, _enabled: boolean) => disabledSkill,
+      } as any,
+      { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
+    )
+
+    const res = await app.request('/skills/pdf/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false }),
+    })
+    const body = await res.json() as { name: string; enabled: boolean; usable: boolean }
+
+    expect(res.status).toBe(200)
+    expect(body.name).toBe('pdf')
+    expect(body.enabled).toBe(false)
+    expect(body.usable).toBe(false)
+  })
+
+  test('POST /skills/:name/toggle 不存在的 skill 返回 404', async () => {
+    const app = createSkillsRoutes(
+      {
+        loadAllSkills: () => [baseSkill],
+        getCacheStats: () => ({}),
+        getConfig: () => ({}),
+        refresh: () => [baseSkill],
+        loadSkillsForAgent: () => [baseSkill],
+        setSkillEnabled: () => null,
+      } as any,
+      { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
+    )
+
+    const res = await app.request('/skills/nonexistent/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false }),
+    })
+
+    expect(res.status).toBe(404)
+  })
+
+  test('GET /skills 返回含 enabled 和 usable 字段', async () => {
+    const app = createSkillsRoutes(
+      {
+        loadAllSkills: () => [baseSkill],
+        getCacheStats: () => ({}),
+        getConfig: () => ({}),
+        refresh: () => [baseSkill],
+        loadSkillsForAgent: () => [baseSkill],
+      } as any,
+      { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
+    )
+
+    const res = await app.request('/skills')
+    const body = await res.json() as Array<{ name: string; enabled: boolean; usable: boolean }>
+
+    expect(res.status).toBe(200)
+    expect(body[0]?.enabled).toBe(true)
+    expect(body[0]?.usable).toBe(true)
   })
 })

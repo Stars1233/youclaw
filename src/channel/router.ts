@@ -43,7 +43,10 @@ export class MessageRouter {
   async handleInbound(message: InboundMessage): Promise<void> {
     const logger = getLogger()
 
-    // 解析 agent
+    // 推断 channel 类型（优先用消息自带的 channel 字段）
+    const channel = message.channel ?? (message.chatId.startsWith('tg:') ? 'telegram' : 'web')
+
+    // 使用 AgentRouter 或回退到旧逻辑
     const managed = this.agentManager.resolveAgent(message.chatId)
     if (!managed) {
       logger.warn({ chatId: message.chatId }, '没有找到对应的 agent')
@@ -66,14 +69,14 @@ export class MessageRouter {
 
     if (requestedSkills.length === 0 && this.skillsLoader) {
       const allSkills = this.skillsLoader.loadAllSkills()
-      const knownNames = new Set(allSkills.map((s) => s.name))
+      const knownNames = new Set(allSkills.filter((s) => s.usable).map((s) => s.name))
       const parsed = parseSkillInvocations(message.content, knownNames)
       requestedSkills = parsed.requestedSkills
       contentForAgent = parsed.cleanContent || message.content
     }
 
     // 存入数据库
-    upsertChat(message.chatId, config.id, message.senderName, message.chatId.startsWith('tg:') ? 'telegram' : 'web')
+    upsertChat(message.chatId, config.id, message.senderName, channel)
     saveMessage({
       id: message.id,
       chatId: message.chatId,
@@ -111,7 +114,7 @@ export class MessageRouter {
       // 记录到每日日志
       if (this.memoryManager) {
         try {
-          this.memoryManager.appendDailyLog(config.id, message.chatId, message.content, reply)
+          this.memoryManager.appendDailyLog(config.id, message.chatId, message.content, reply, config.memory?.maxLogEntryLength)
         } catch (logErr) {
           getLogger().error({ error: logErr, agentId: config.id }, '记录每日日志失败')
         }
