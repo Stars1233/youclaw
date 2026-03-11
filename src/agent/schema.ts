@@ -39,6 +39,7 @@ export const AgentConfigSchema = z.object({
   mcpServers: z.record(z.string(), McpServerSchema).optional(),
   maxTurns: z.number().optional(),
   effort: z.enum(['low', 'medium', 'high', 'max']).optional(),
+  browserProfile: z.string().optional(),
 })
 
 // 从 schema 推导类型

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { getPaths } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
+import { getBrowserProfile } from '../db/index.ts'
 import type { SkillsLoader } from '../skills/index.ts'
 import type { MemoryManager } from '../memory/index.ts'
 import type { AgentConfig } from './types.ts'
@@ -46,6 +47,12 @@ export class PromptBuilder {
     const skillsPrompt = this.buildSkillsPrompt(config, context?.requestedSkills)
     if (skillsPrompt) {
       parts.push(skillsPrompt)
+    }
+
+    // 注入浏览器 Profile 上下文
+    const browserCtx = this.buildBrowserProfileContext(config)
+    if (browserCtx) {
+      parts.push(browserCtx)
     }
 
     // 注入记忆上下文
@@ -129,13 +136,24 @@ export class PromptBuilder {
   }
 
   /**
+   * 构建浏览器 Profile 上下文
+   */
+  private buildBrowserProfileContext(config: AgentConfig): string | null {
+    if (!config.browserProfile) return null
+    const profile = getBrowserProfile(config.browserProfile)
+    if (!profile) return null
+    const profileDir = resolve(getPaths().browserProfiles, profile.id)
+    return `## Browser Profile\n\nWhen using agent-browser, ALWAYS include \`--profile ${profileDir}\` to use the persistent browser profile "${profile.name}". Example:\n\n\`\`\`bash\nagent-browser --profile ${profileDir} open https://example.com\n\`\`\``
+  }
+
+  /**
    * 构建 skills 提示词片段
    */
   private buildSkillsPrompt(config: AgentConfig, requestedSkills?: string[]): string | null {
     if (!this.skillsLoader) return null
 
     const skills = this.skillsLoader.loadSkillsForAgent(config)
-    const eligibleSkills = skills.filter((s) => s.eligible)
+    const eligibleSkills = skills.filter((s) => s.usable)
 
     if (eligibleSkills.length === 0) return null
 
