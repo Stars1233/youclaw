@@ -407,6 +407,15 @@ function createAppMenu(): void {
   }
 }
 
+function getTitleBarOverlay() {
+  const isDark = nativeTheme.shouldUseDarkColors;
+  return {
+    color: isDark ? "#0a0a0a" : "#ffffff",
+    symbolColor: isDark ? "#f9f9f9" : "#0a0a0a",
+    height: 47,
+  };
+}
+
 function createWindow(): void {
   const isMac = process.platform === "darwin";
   const isWin = process.platform === "win32";
@@ -430,6 +439,7 @@ function createWindow(): void {
     ...(isWin
       ? {
           titleBarStyle: "hidden",
+          titleBarOverlay: getTitleBarOverlay(),
         }
       : {}),
     webPreferences: {
@@ -447,6 +457,7 @@ function createWindow(): void {
   mainWindow.on("moved", saveBounds);
   mainWindow.on("maximize", () => mainWindow?.webContents.send("window-maximize-change", true));
   mainWindow.on("unmaximize", () => mainWindow?.webContents.send("window-maximize-change", false));
+  nativeTheme.on("updated", () => mainWindow?.setTitleBarOverlay(getTitleBarOverlay()));
 
   mainWindow.loadFile(path.join(__dirname, "../../../dist/renderer/index.html"));
 
@@ -471,15 +482,6 @@ app.whenReady().then(async () => {
   applyTheme(savedTheme);
 
   ipcMain.handle("get-version", () => app.getVersion());
-  ipcMain.handle("window-minimize", () => mainWindow?.minimize());
-  ipcMain.handle("window-maximize", () => {
-    if (mainWindow?.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow?.maximize();
-    }
-  });
-  ipcMain.handle("window-close", () => mainWindow?.close());
   ipcMain.handle("get-theme", () => store.get("theme"));
   ipcMain.handle("set-theme", (_event, theme: string) => {
     store.set("theme", theme);
