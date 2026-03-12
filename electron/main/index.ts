@@ -5,7 +5,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, nativeTheme } fro
 import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import Store from "electron-store";
 import { setupUpdater, checkForUpdates, setAllowPrerelease } from "./updater.js";
 
@@ -40,7 +40,7 @@ function getBackendDir(): string {
 
 async function importBackend(name: string): Promise<any> {
   const modulePath = path.join(getBackendDir(), name);
-  return import(modulePath);
+  return import(pathToFileURL(modulePath).href);
 }
 
 /** Load .env file manually (Bun auto-loads, Electron/Node does not) */
