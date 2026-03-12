@@ -143,6 +143,7 @@ export function AppSidebar({ onOpenSettings }: AppSidebarProps) {
               'text-muted-foreground hover:text-foreground hover:bg-accent'
             )}
             aria-label={t.sidebar.newChat}
+            data-testid="nav-chat"
           >
             <div className="w-9 h-9 shrink-0 flex items-center justify-center">
               <SquarePen className="h-4 w-4" />
@@ -164,6 +165,7 @@ export function AppSidebar({ onOpenSettings }: AppSidebarProps) {
                 isActive ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'
               )}
               aria-label={item.label}
+              data-testid={`nav-${item.to.slice(1)}`}
             >
               <div className="w-9 h-9 shrink-0 flex items-center justify-center">
                 <item.icon className="h-4 w-4" />
