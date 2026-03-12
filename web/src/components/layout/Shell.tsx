@@ -1,29 +1,48 @@
 import { type ReactNode, useState, useEffect } from 'react'
-import { Sidebar } from './Sidebar'
-import { Topbar } from './Topbar'
+import { AppSidebar } from './AppSidebar'
+import { SidebarProvider } from '@/hooks/useSidebar'
+import { ChatProvider } from '@/hooks/useChatContext'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { isElectron, getElectronAPI } from '@/api/transport'
 
 export function Shell({ children }: { children: ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [platform, setPlatform] = useState('')
 
-  // Electron：监听菜单栏 Cmd+, 打开设置
   useEffect(() => {
     if (!isElectron) return
     const cleanup = getElectronAPI().onOpenSettings(() => setSettingsOpen(true))
     return cleanup
   }, [])
 
+  useEffect(() => {
+    if (isElectron) setPlatform(getElectronAPI().getPlatform())
+  }, [])
+
+  const isWin = platform === 'win32'
+
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground">
-      <Topbar onOpenSettings={() => setSettingsOpen(true)} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-hidden">
-          {children}
-        </main>
-      </div>
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-    </div>
+    <ChatProvider>
+      <SidebarProvider>
+        <div className="h-screen flex bg-background text-foreground">
+          <AppSidebar onOpenSettings={() => setSettingsOpen(true)} />
+          <main className="flex-1 overflow-hidden flex flex-col">
+            {/* Windows: drag region 条 */}
+            {isWin && (
+              <div
+                className="h-8 shrink-0 flex justify-end"
+                style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+              >
+                <div className="w-32 shrink-0" />
+              </div>
+            )}
+            <div className="flex-1 overflow-hidden">
+              {children}
+            </div>
+          </main>
+        </div>
+        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      </SidebarProvider>
+    </ChatProvider>
   )
 }
