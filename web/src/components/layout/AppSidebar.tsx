@@ -20,6 +20,9 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+/** 图标固定左侧 padding，保证收起/展开时图标位置不变 */
+const ICON_PX = 'pl-[7px]'
+
 interface AppSidebarProps {
   onOpenSettings: () => void
 }
@@ -82,7 +85,8 @@ export function AppSidebar({ onOpenSettings }: AppSidebarProps) {
     <>
       <aside
         className={cn(
-          'shrink-0 flex flex-col border-r border-border bg-muted/30 transition-all duration-200 ease-in-out overflow-hidden',
+          'shrink-0 flex flex-col border-r border-border bg-muted/30 overflow-hidden',
+          'transition-[width] duration-200 ease-in-out',
           isCollapsed ? 'w-[52px]' : 'w-[260px]'
         )}
         aria-expanded={!isCollapsed}
@@ -90,9 +94,9 @@ export function AppSidebar({ onOpenSettings }: AppSidebarProps) {
         {/* macOS 交通灯空间 */}
         {isMac && <div className="h-7 shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />}
 
-        {/* 顶部操作栏：图标位置固定，展开时显示文字 */}
+        {/* 顶部操作栏 */}
         <div
-          className="flex items-center gap-1.5 px-1.5 pt-2 pb-2"
+          className={cn('flex items-center h-[52px] shrink-0', ICON_PX)}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button
@@ -103,39 +107,49 @@ export function AppSidebar({ onOpenSettings }: AppSidebarProps) {
           >
             {isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
-          {!isCollapsed && (
-            <>
-              <span className="text-sm font-semibold tracking-tight truncate">YouClaw</span>
-              <div className="flex-1" />
-              <button
-                type="button"
-                onClick={handleNewChat}
-                className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center hover:bg-accent transition-colors"
-                aria-label={t.sidebar.newChat}
-              >
-                <SquarePen className="h-4 w-4" />
-              </button>
-            </>
-          )}
+          <span className={cn(
+            'text-sm font-semibold tracking-tight whitespace-nowrap overflow-hidden transition-[opacity,margin] duration-200',
+            isCollapsed ? 'opacity-0 ml-0 w-0' : 'opacity-100 ml-1.5'
+          )}>
+            YouClaw
+          </span>
+          <div className="flex-1 min-w-0" />
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className={cn(
+              'w-9 h-9 shrink-0 rounded-lg flex items-center justify-center hover:bg-accent transition-[opacity] duration-200 mr-1.5',
+              isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            )}
+            aria-label={t.sidebar.newChat}
+            tabIndex={isCollapsed ? -1 : 0}
+          >
+            <SquarePen className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* 页面导航 */}
-        <nav className={cn('space-y-0.5', isCollapsed ? 'px-1.5 flex flex-col items-center' : 'px-2')}>
+        {/* 页面导航 — 所有状态布局一致，仅文字被裁切 */}
+        <nav className="space-y-0.5 pr-1.5">
           {navItems.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) => cn(
-                'flex items-center rounded-lg transition-colors',
-                isCollapsed
-                  ? 'w-9 h-9 justify-center'
-                  : 'gap-2.5 px-2.5 py-1.5 text-sm',
+                'flex items-center h-9 rounded-lg transition-colors whitespace-nowrap overflow-hidden',
+                ICON_PX,
                 isActive ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'
               )}
               aria-label={item.label}
             >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!isCollapsed && item.label}
+              <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+                <item.icon className="h-4 w-4" />
+              </div>
+              <span className={cn(
+                'text-sm transition-opacity duration-200',
+                isCollapsed ? 'opacity-0' : 'opacity-100'
+              )}>
+                {item.label}
+              </span>
             </NavLink>
           ))}
         </nav>
@@ -207,32 +221,34 @@ export function AppSidebar({ onOpenSettings }: AppSidebarProps) {
 
         {/* 底部 */}
         <div
-          className={cn(
-            'border-t border-border py-2 flex items-center',
-            isCollapsed ? 'flex-col gap-1 px-1.5' : 'gap-2 px-3'
-          )}
+          className={cn('border-t border-border py-2 flex items-center h-[52px] shrink-0', ICON_PX)}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button
             type="button"
             onClick={onOpenSettings}
-            className={cn(
-              'rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
-              isCollapsed ? 'w-9 h-9' : 'gap-2 px-2.5 py-1.5 text-sm'
-            )}
+            className="flex items-center h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors whitespace-nowrap overflow-hidden"
             aria-label={t.settings.title}
           >
-            <Settings className="h-4 w-4 shrink-0" />
-            {!isCollapsed && t.settings.title}
+            <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+              <Settings className="h-4 w-4" />
+            </div>
+            <span className={cn(
+              'text-sm transition-opacity duration-200',
+              isCollapsed ? 'opacity-0' : 'opacity-100'
+            )}>
+              {t.settings.title}
+            </span>
           </button>
-          {!isCollapsed && <div className="flex-1" />}
+          <div className="flex-1 min-w-0" />
           <button
             type="button"
             onClick={() => setLocale(locale === 'en' ? 'zh' : 'en')}
             className={cn(
-              'rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
-              isCollapsed ? 'w-9 h-7' : 'px-2 py-0.5 border border-border'
+              'shrink-0 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-[opacity] duration-200 w-9 h-7 mr-1.5',
+              isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
+            tabIndex={isCollapsed ? -1 : 0}
           >
             {locale === 'en' ? '中' : 'EN'}
           </button>
