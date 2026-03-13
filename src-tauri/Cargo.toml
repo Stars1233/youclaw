@@ -27,8 +27,7 @@ log = "0.4"
 
 [profile.release]
 strip = true
-lto = true
-codegen-units = 1
+lto = "thin"
 opt-level = "s"
 
 [features]

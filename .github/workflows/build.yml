@@ -48,6 +48,16 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: rustup target add x86_64-apple-darwin
 
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: rust-${{ matrix.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: rust-${{ matrix.arch }}-
+
       - name: Install root dependencies
         run: bun install
 
@@ -139,6 +149,16 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-action/setup@v1
+
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: rust-windows-x64-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: rust-windows-x64-
 
       - name: Install root dependencies
         run: bun install

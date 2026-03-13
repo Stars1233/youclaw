@@ -298,7 +298,7 @@ export const AttachmentInfo = ({
   return (
     <div className={cn("min-w-0 flex-1", className)} {...props}>
       <span className="block truncate">{label}</span>
-      {showMediaType && data.mediaType && (
+      {showMediaType && 'mediaType' in data && data.mediaType && (
         <span className="block truncate text-muted-foreground text-xs">
           {data.mediaType}
         </span>
