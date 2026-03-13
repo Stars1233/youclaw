@@ -65,17 +65,22 @@ jobs:
         run: bun install
         working-directory: web
 
-      - name: Set version
+      - name: Set version & updater endpoint
         shell: bash
+        env:
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
         run: |
           bun -e "
             const fs = require('fs');
             const ver = '${{ steps.version.outputs.VERSION }}';
+            const endpoint = process.env.OSS_BUCKET + '.' + process.env.OSS_ENDPOINT;
             const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
             pkg.version = ver;
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
             tauri.version = ver;
+            tauri.plugins.updater.endpoints = ['https://' + endpoint + '/releases/latest.json'];
             fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2) + '\n');
           "
 
@@ -100,7 +105,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_CERTIFICATE: ${{ secrets.MAC_CERTS }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -113,7 +117,7 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.tauri_args }}
-          updaterJsonKeepUniversal: true
+          uploadUpdaterJson: false
 
       - name: Notify Feishu
         if: always()
@@ -171,17 +175,22 @@ jobs:
         run: bun install
         working-directory: web
 
-      - name: Set version
+      - name: Set version & updater endpoint
         shell: bash
+        env:
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
         run: |
           bun -e "
             const fs = require('fs');
             const ver = '${{ steps.version.outputs.VERSION }}';
+            const endpoint = process.env.OSS_BUCKET + '.' + process.env.OSS_ENDPOINT;
             const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
             pkg.version = ver;
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
             tauri.version = ver;
+            tauri.plugins.updater.endpoints = ['https://' + endpoint + '/releases/latest.json'];
             fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2) + '\n');
           "
 
@@ -207,7 +216,7 @@ jobs:
           releaseBody: ""
           releaseDraft: false
           prerelease: false
-          updaterJsonKeepUniversal: true
+          uploadUpdaterJson: false
 
       - name: Notify Feishu
         if: always()
@@ -261,17 +270,22 @@ jobs:
         run: bun install
         working-directory: web
 
-      - name: Set version
+      - name: Set version & updater endpoint
         shell: bash
+        env:
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
         run: |
           bun -e "
             const fs = require('fs');
             const ver = '${{ steps.version.outputs.VERSION }}';
+            const endpoint = process.env.OSS_BUCKET + '.' + process.env.OSS_ENDPOINT;
             const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
             pkg.version = ver;
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
             tauri.version = ver;
+            tauri.plugins.updater.endpoints = ['https://' + endpoint + '/releases/latest.json'];
             fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2) + '\n');
           "
 
@@ -296,7 +310,7 @@ jobs:
           releaseBody: ""
           releaseDraft: false
           prerelease: false
-          updaterJsonKeepUniversal: true
+          uploadUpdaterJson: false
 
       - name: Notify Feishu
         if: always()
@@ -311,6 +325,123 @@ jobs:
                 content:
                 - - tag: text
                     text: "Build "
+                  - tag: a
+                    text: "#${{ github.run_number }}"
+                    href: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  - tag: text
+                    text: " ${{ job.status == 'success' && 'succeeded' || 'failed' }}"
+
+  # ── Upload to OSS & generate updater manifest ──
+  updater:
+    needs: [build-mac, build-windows]
+    if: always() && (needs.build-mac.result == 'success' || needs.build-windows.result == 'success')
+    runs-on: ubuntu-latest
+    name: Upload to OSS & generate latest.json
+
+    steps:
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Install ossutil
+        run: |
+          curl -fsSL https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
+
+      - name: Configure ossutil
+        env:
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
+        run: |
+          ossutil config \
+            -e "$OSS_ENDPOINT" \
+            -i "$OSS_ACCESS_KEY_ID" \
+            -k "$OSS_ACCESS_KEY_SECRET"
+
+      - name: Download release assets & upload to OSS
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          OSS_BASE="oss://${OSS_BUCKET}/releases/${TAG}"
+          CDN_BASE="https://${OSS_BUCKET}.${OSS_ENDPOINT}/releases/${TAG}"
+
+          # 下载所有 release 产物（安装包 + 签名）
+          mkdir -p assets
+          gh release download "$TAG" -R "$REPO" --dir assets || true
+
+          echo "=== Downloaded assets ==="
+          ls -la assets/
+
+          # 上传所有产物到 OSS（版本目录 + latest 固定目录）
+          for f in assets/*; do
+            [ ! -f "$f" ] && continue
+            NAME=$(basename "$f")
+            echo "Uploading: $NAME"
+            ossutil cp "$f" "${OSS_BASE}/${NAME}" -f
+            ossutil cp "$f" "oss://${OSS_BUCKET}/releases/latest/${NAME}" -f
+          done
+
+          # 构建 latest.json
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          PLATFORMS='{}'
+
+          for f in assets/*.sig; do
+            [ ! -f "$f" ] && continue
+            SIG=$(cat "$f")
+            NAME=$(basename "$f")
+
+            case "$NAME" in
+              *_aarch64.app.tar.gz.sig)
+                PLATFORMS=$(echo "$PLATFORMS" | jq \
+                  --arg sig "$SIG" \
+                  --arg url "${CDN_BASE}/You.Claw_aarch64.app.tar.gz" \
+                  '. + {"darwin-aarch64": {"signature": $sig, "url": $url}}')
+                ;;
+              *_x64.app.tar.gz.sig)
+                PLATFORMS=$(echo "$PLATFORMS" | jq \
+                  --arg sig "$SIG" \
+                  --arg url "${CDN_BASE}/You.Claw_x64.app.tar.gz" \
+                  '. + {"darwin-x86_64": {"signature": $sig, "url": $url}}')
+                ;;
+              *_x64-setup.nsis.zip.sig)
+                PLATFORMS=$(echo "$PLATFORMS" | jq \
+                  --arg sig "$SIG" \
+                  --arg url "${CDN_BASE}/You.Claw_${VERSION}_x64-setup.nsis.zip" \
+                  '. + {"windows-x86_64": {"signature": $sig, "url": $url}}')
+                ;;
+            esac
+          done
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg date "$DATE" \
+            --argjson platforms "$PLATFORMS" \
+            '{version: $version, pub_date: $date, platforms: $platforms}' > latest.json
+
+          echo "=== latest.json ==="
+          cat latest.json
+
+          # 上传 latest.json 到固定路径（updater 读取）
+          ossutil cp latest.json "oss://${OSS_BUCKET}/releases/latest.json" -f
+
+      - name: Notify Feishu
+        if: always()
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: ${{ secrets.FEISHU_WEBHOOK }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: "You Claw ${{ github.ref_name }} · OSS Upload ${{ job.status == 'success' && '✅' || '❌' }}"
+                content:
+                - - tag: text
+                    text: "OSS upload & updater "
                   - tag: a
                     text: "#${{ github.run_number }}"
                     href: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
