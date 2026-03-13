@@ -53,9 +53,7 @@
       "nsis": {
         "displayLanguageSelector": false,
         "installMode": "both",
-        "languages": ["SimpChinese", "English"],
-        "headerImage": "icons/nsis-header.bmp",
-        "sidebarImage": "icons/nsis-sidebar.bmp"
+        "languages": ["SimpChinese", "English"]
       }
     }
   },
