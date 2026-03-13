@@ -169,7 +169,13 @@ export class TelegramChannel implements Channel {
   async disconnect(): Promise<void> {
     const logger = getLogger()
     if (this.bot) {
-      this.bot.stop()
+      try {
+        await this.bot.stop()
+      } catch (err) {
+        // grammy 的 stop() 内部会调用 getUpdates 确认 offset，
+        // 如果 token 无效会抛出异常，这里安全忽略
+        logger.debug({ err: err instanceof Error ? err.message : String(err) }, 'Telegram bot stop error (ignored)')
+      }
       this.bot = null
       logger.info('Telegram bot stopped')
     }
