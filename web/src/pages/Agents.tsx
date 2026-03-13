@@ -130,6 +130,13 @@ export function Agents() {
     await updateAgentConfig(selected, { browserProfile: profileId ?? null })
   }
 
+  // 修改 Agent 名称
+  const handleRename = async (newName: string) => {
+    if (!selected) return
+    await updateAgentConfig(selected, { name: newName })
+    loadAgents()
+  }
+
   const selectedAgent = agents.find((a) => a.id === selected)
 
   // 保存文档
@@ -281,6 +288,7 @@ export function Agents() {
             browserProfiles={browserProfiles}
             agentBrowserProfile={agentBrowserProfile}
             onSaveBrowserProfile={handleSaveBrowserProfile}
+            onRename={handleRename}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -400,6 +408,7 @@ function AgentDetail({
   browserProfiles,
   agentBrowserProfile,
   onSaveBrowserProfile,
+  onRename,
 }: {
   t: ReturnType<typeof useI18n>['t']
   agent: Agent
@@ -420,7 +429,10 @@ function AgentDetail({
   browserProfiles: BrowserProfileDTO[]
   agentBrowserProfile: string | undefined
   onSaveBrowserProfile: (profileId: string | undefined) => Promise<void>
+  onRename: (newName: string) => Promise<void>
 }) {
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(agent.name)
   return (
     <div className="p-6 max-w-3xl space-y-6">
       {/* 头部 */}
@@ -430,7 +442,41 @@ function AgentDetail({
             <Bot className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold">{agent.name}</h1>
+            <div className="flex items-center gap-2">
+              {isEditingName ? (
+                <form
+                  className="flex items-center gap-2"
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    const trimmed = nameValue.trim()
+                    if (trimmed && trimmed !== agent.name) {
+                      await onRename(trimmed)
+                    }
+                    setIsEditingName(false)
+                  }}
+                >
+                  <input
+                    autoFocus
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onBlur={() => { setIsEditingName(false); setNameValue(agent.name) }}
+                    onKeyDown={(e) => { if (e.key === 'Escape') { setIsEditingName(false); setNameValue(agent.name) } }}
+                    className="text-xl font-semibold bg-muted border border-border rounded-md px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </form>
+              ) : (
+                <>
+                  <h1 className="text-xl font-semibold">{agent.name}</h1>
+                  <button
+                    onClick={() => { setNameValue(agent.name); setIsEditingName(true) }}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title={t.common.edit}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">{agent.id} · {agent.model}</p>
           </div>
         </div>
