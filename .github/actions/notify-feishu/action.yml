@@ -1,0 +1,41 @@
+name: Notify Feishu
+description: Send build status notification to Feishu webhook
+
+inputs:
+  webhook-url:
+    description: Feishu webhook URL
+    required: true
+  title:
+    description: Notification title
+    required: true
+  run-number:
+    description: GitHub Actions run number
+    required: true
+  run-url:
+    description: GitHub Actions run URL
+    required: true
+  status:
+    description: "Job status (success/failure/cancelled)"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Send Feishu notification
+      if: always()
+      uses: foxundermoon/feishu-action@v2
+      with:
+        url: ${{ inputs.webhook-url }}
+        msg_type: post
+        content: |
+          post:
+            zh_cn:
+              title: "${{ inputs.title }} ${{ inputs.status == 'success' && '✅' || '❌' }}"
+              content:
+              - - tag: text
+                  text: "Build "
+                - tag: a
+                  text: "#${{ inputs.run-number }}"
+                  href: "${{ inputs.run-url }}"
+                - tag: text
+                  text: " ${{ inputs.status == 'success' && 'succeeded' || 'failed' }}"

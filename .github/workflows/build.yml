@@ -5,6 +5,17 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  CARGO_HOME: ${{ github.workspace }}/.cargo
 
 jobs:
   # ── macOS builds ──
@@ -20,7 +31,7 @@ jobs:
             tauri_args: "--target aarch64-apple-darwin"
             platform_label: "macOS Apple Silicon"
           - arch: x86_64
-            runner: macos-latest
+            runner: macos-13
             bun_target: bun-darwin-x64
             sidecar_suffix: x86_64-apple-darwin
             tauri_args: "--target x86_64-apple-darwin"
@@ -30,63 +41,16 @@ jobs:
     name: Build ${{ matrix.platform_label }}
 
     steps:
-      - name: Extract version
-        id: version
-        shell: bash
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Add Rust target (x86_64 cross-compile)
-        if: matrix.arch == 'x86_64'
-        run: rustup target add x86_64-apple-darwin
-
-      - name: Cache Rust
-        uses: actions/cache@v4
+      - name: Setup build environment
+        id: setup
+        uses: ./.github/actions/setup-build-env
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: rust-${{ matrix.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: rust-${{ matrix.arch }}-
-
-      - name: Install root dependencies
-        run: bun install
-
-      - name: Install web dependencies
-        run: bun install
-        working-directory: web
-
-      - name: Set version & updater endpoint
-        shell: bash
-        env:
-          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
-          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
-        run: |
-          bun -e "
-            const fs = require('fs');
-            const ver = '${{ steps.version.outputs.VERSION }}';
-            const endpoint = process.env.OSS_BUCKET + '.' + process.env.OSS_ENDPOINT;
-            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
-            pkg.version = ver;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-            const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
-            tauri.version = ver;
-            tauri.plugins.updater.endpoints = ['https://' + endpoint + '/releases/latest.json'];
-            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2) + '\n');
-          "
-
-      - name: Prepare runtime directories
-        run: mkdir -p agents && touch agents/.gitkeep
-        shell: bash
+          sidecar-suffix: ${{ matrix.sidecar_suffix }}
+          oss-bucket: ${{ secrets.OSS_BUCKET }}
+          oss-endpoint: ${{ secrets.OSS_ENDPOINT }}
 
       - name: Build sidecar
         run: |
@@ -112,7 +76,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "You Claw v${{ steps.version.outputs.VERSION }}"
+          releaseName: "You Claw v${{ steps.setup.outputs.version }}"
           releaseBody: ""
           releaseDraft: false
           prerelease: false
@@ -121,22 +85,13 @@ jobs:
 
       - name: Notify Feishu
         if: always()
-        uses: foxundermoon/feishu-action@v2
+        uses: ./.github/actions/notify-feishu
         with:
-          url: ${{ secrets.FEISHU_WEBHOOK }}
-          msg_type: post
-          content: |
-            post:
-              zh_cn:
-                title: "You Claw v${{ steps.version.outputs.VERSION }} · ${{ matrix.platform_label }} ${{ job.status == 'success' && '✅' || '❌' }}"
-                content:
-                - - tag: text
-                    text: "Build "
-                  - tag: a
-                    text: "#${{ github.run_number }}"
-                    href: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  - tag: text
-                    text: " ${{ job.status == 'success' && 'succeeded' || 'failed' }}"
+          webhook-url: ${{ secrets.FEISHU_WEBHOOK }}
+          title: "You Claw v${{ steps.setup.outputs.version }} · ${{ matrix.platform_label }}"
+          run-number: ${{ github.run_number }}
+          run-url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          status: ${{ job.status }}
 
   # ── Windows build ──
   build-windows:
@@ -144,59 +99,16 @@ jobs:
     name: Build Windows x64
 
     steps:
-      - name: Extract version
-        id: version
-        shell: bash
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: actions/cache@v4
+      - name: Setup build environment
+        id: setup
+        uses: ./.github/actions/setup-build-env
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: rust-windows-x64-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: rust-windows-x64-
-
-      - name: Install root dependencies
-        run: bun install
-
-      - name: Install web dependencies
-        run: bun install
-        working-directory: web
-
-      - name: Set version & updater endpoint
-        shell: bash
-        env:
-          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
-          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
-        run: |
-          bun -e "
-            const fs = require('fs');
-            const ver = '${{ steps.version.outputs.VERSION }}';
-            const endpoint = process.env.OSS_BUCKET + '.' + process.env.OSS_ENDPOINT;
-            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
-            pkg.version = ver;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-            const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
-            tauri.version = ver;
-            tauri.plugins.updater.endpoints = ['https://' + endpoint + '/releases/latest.json'];
-            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2) + '\n');
-          "
-
-      - name: Prepare runtime directories
-        run: mkdir -p agents && touch agents/.gitkeep
-        shell: bash
+          sidecar-suffix: x86_64-pc-windows-msvc
+          oss-bucket: ${{ secrets.OSS_BUCKET }}
+          oss-endpoint: ${{ secrets.OSS_ENDPOINT }}
 
       - name: Build sidecar
         shell: bash
@@ -212,7 +124,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "You Claw v${{ steps.version.outputs.VERSION }}"
+          releaseName: "You Claw v${{ steps.setup.outputs.version }}"
           releaseBody: ""
           releaseDraft: false
           prerelease: false
@@ -220,78 +132,38 @@ jobs:
 
       - name: Notify Feishu
         if: always()
-        uses: foxundermoon/feishu-action@v2
+        uses: ./.github/actions/notify-feishu
         with:
-          url: ${{ secrets.FEISHU_WEBHOOK }}
-          msg_type: post
-          content: |
-            post:
-              zh_cn:
-                title: "You Claw v${{ steps.version.outputs.VERSION }} · Windows x64 ${{ job.status == 'success' && '✅' || '❌' }}"
-                content:
-                - - tag: text
-                    text: "Build "
-                  - tag: a
-                    text: "#${{ github.run_number }}"
-                    href: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  - tag: text
-                    text: " ${{ job.status == 'success' && 'succeeded' || 'failed' }}"
+          webhook-url: ${{ secrets.FEISHU_WEBHOOK }}
+          title: "You Claw v${{ steps.setup.outputs.version }} · Windows x64"
+          run-number: ${{ github.run_number }}
+          run-url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          status: ${{ job.status }}
 
   # ── Linux build ── [temporarily disabled]
+  # 启用时需要：1) 将 if 改为 true  2) 在 updater job 的 needs 中添加 build-linux
+  #             3) 在 updater job 的 if 条件中添加 build-linux.result == 'success'
   build-linux:
-    if: false
+    if: ${{ false }}
     runs-on: ubuntu-22.04
     name: Build Linux x64
 
     steps:
-      - name: Extract version
-        id: version
-        shell: bash
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup build environment
+        id: setup
+        uses: ./.github/actions/setup-build-env
+        with:
+          sidecar-suffix: x86_64-unknown-linux-gnu
+          oss-bucket: ${{ secrets.OSS_BUCKET }}
+          oss-endpoint: ${{ secrets.OSS_ENDPOINT }}
 
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Install root dependencies
-        run: bun install
-
-      - name: Install web dependencies
-        run: bun install
-        working-directory: web
-
-      - name: Set version & updater endpoint
-        shell: bash
-        env:
-          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
-          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
-        run: |
-          bun -e "
-            const fs = require('fs');
-            const ver = '${{ steps.version.outputs.VERSION }}';
-            const endpoint = process.env.OSS_BUCKET + '.' + process.env.OSS_ENDPOINT;
-            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
-            pkg.version = ver;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-            const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
-            tauri.version = ver;
-            tauri.plugins.updater.endpoints = ['https://' + endpoint + '/releases/latest.json'];
-            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2) + '\n');
-          "
-
-      - name: Prepare runtime directories
-        run: mkdir -p agents && touch agents/.gitkeep
-        shell: bash
 
       - name: Build sidecar
         run: |
@@ -306,7 +178,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "You Claw v${{ steps.version.outputs.VERSION }}"
+          releaseName: "You Claw v${{ steps.setup.outputs.version }}"
           releaseBody: ""
           releaseDraft: false
           prerelease: false
@@ -314,31 +186,25 @@ jobs:
 
       - name: Notify Feishu
         if: always()
-        uses: foxundermoon/feishu-action@v2
+        uses: ./.github/actions/notify-feishu
         with:
-          url: ${{ secrets.FEISHU_WEBHOOK }}
-          msg_type: post
-          content: |
-            post:
-              zh_cn:
-                title: "You Claw v${{ steps.version.outputs.VERSION }} · Linux x64 ${{ job.status == 'success' && '✅' || '❌' }}"
-                content:
-                - - tag: text
-                    text: "Build "
-                  - tag: a
-                    text: "#${{ github.run_number }}"
-                    href: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  - tag: text
-                    text: " ${{ job.status == 'success' && 'succeeded' || 'failed' }}"
+          webhook-url: ${{ secrets.FEISHU_WEBHOOK }}
+          title: "You Claw v${{ steps.setup.outputs.version }} · Linux x64"
+          run-number: ${{ github.run_number }}
+          run-url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          status: ${{ job.status }}
 
   # ── Upload to OSS & generate updater manifest ──
   updater:
     needs: [build-mac, build-windows]
-    if: always() && (needs.build-mac.result == 'success' || needs.build-windows.result == 'success')
+    if: always() && (needs.build-mac.result == 'success' && needs.build-windows.result == 'success')
     runs-on: ubuntu-latest
     name: Upload to OSS & generate latest.json
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
@@ -372,7 +238,7 @@ jobs:
 
           # 下载所有 release 产物（安装包 + 签名）
           mkdir -p assets
-          gh release download "$TAG" -R "$REPO" --dir assets || true
+          gh release download "$TAG" -R "$REPO" --dir assets
 
           echo "=== Downloaded assets ==="
           ls -la assets/
@@ -386,7 +252,16 @@ jobs:
             ossutil cp "$f" "oss://${OSS_BUCKET}/releases/latest/${NAME}" -f
           done
 
+          # 校验签名文件数量
+          SIG_COUNT=$(ls assets/*.sig 2>/dev/null | wc -l)
+          echo "Found ${SIG_COUNT} signature files"
+          if [ "$SIG_COUNT" -eq 0 ]; then
+            echo "::error::No signature files found — updater manifest would be empty"
+            exit 1
+          fi
+
           # 构建 latest.json
+          # 注意：version 字段不带 v 前缀，这是 Tauri updater 的预期格式
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           PLATFORMS='{}'
 
@@ -417,6 +292,14 @@ jobs:
             esac
           done
 
+          # 校验 platforms 数量
+          PLATFORM_COUNT=$(echo "$PLATFORMS" | jq 'keys | length')
+          echo "Platforms in manifest: ${PLATFORM_COUNT}"
+          if [ "$PLATFORM_COUNT" -eq 0 ]; then
+            echo "::error::No platforms matched in latest.json — check sig file naming"
+            exit 1
+          fi
+
           jq -n \
             --arg version "$VERSION" \
             --arg date "$DATE" \
@@ -431,19 +314,10 @@ jobs:
 
       - name: Notify Feishu
         if: always()
-        uses: foxundermoon/feishu-action@v2
+        uses: ./.github/actions/notify-feishu
         with:
-          url: ${{ secrets.FEISHU_WEBHOOK }}
-          msg_type: post
-          content: |
-            post:
-              zh_cn:
-                title: "You Claw ${{ github.ref_name }} · OSS Upload ${{ job.status == 'success' && '✅' || '❌' }}"
-                content:
-                - - tag: text
-                    text: "OSS upload & updater "
-                  - tag: a
-                    text: "#${{ github.run_number }}"
-                    href: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  - tag: text
-                    text: " ${{ job.status == 'success' && 'succeeded' || 'failed' }}"
+          webhook-url: ${{ secrets.FEISHU_WEBHOOK }}
+          title: "You Claw ${{ github.ref_name }} · OSS Upload"
+          run-number: ${{ github.run_number }}
+          run-url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          status: ${{ job.status }}

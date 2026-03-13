@@ -36,7 +36,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "targets": ["nsis", "dmg"],
+    "targets": "all",
     "externalBin": [
       "bin/youclaw-server"
     ],

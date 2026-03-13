@@ -1,0 +1,105 @@
+name: Setup Build Environment
+description: Shared build environment setup for all platform builds
+
+inputs:
+  sidecar-suffix:
+    description: Sidecar binary suffix (e.g. aarch64-apple-darwin)
+    required: true
+  rust-targets:
+    description: Additional Rust targets to install (space-separated)
+    required: false
+    default: ""
+  oss-bucket:
+    description: OSS bucket name
+    required: true
+  oss-endpoint:
+    description: OSS endpoint
+    required: true
+
+outputs:
+  version:
+    description: Semver version without v prefix
+    value: ${{ steps.version.outputs.VERSION }}
+  tag:
+    description: Git tag (with v prefix)
+    value: ${{ steps.version.outputs.TAG }}
+
+runs:
+  using: composite
+  steps:
+    # ── 版本提取 ──
+    - name: Extract version
+      id: version
+      shell: bash
+      run: |
+        echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+    # ── Bun ──
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Cache Bun dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'web/bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-
+
+    # ── Rust ──
+    - name: Setup Rust
+      id: rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Add Rust targets
+      if: inputs.rust-targets != ''
+      shell: bash
+      run: rustup target add ${{ inputs.rust-targets }}
+
+    - name: Cache Rust
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/.cargo/registry
+          ${{ github.workspace }}/.cargo/git
+          src-tauri/target
+        key: rust-${{ runner.os }}-${{ inputs.sidecar-suffix }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+        restore-keys: |
+          rust-${{ runner.os }}-${{ inputs.sidecar-suffix }}-${{ steps.rust.outputs.cachekey }}-
+          rust-${{ runner.os }}-${{ inputs.sidecar-suffix }}-
+
+    # ── 依赖安装 ──
+    - name: Install root dependencies
+      shell: bash
+      run: bun install
+
+    - name: Install web dependencies
+      shell: bash
+      run: bun install
+      working-directory: web
+
+    # ── 版本写入（通过环境变量防注入）──
+    - name: Set version & updater endpoint
+      shell: bash
+      env:
+        APP_VERSION: ${{ steps.version.outputs.VERSION }}
+        OSS_BUCKET: ${{ inputs.oss-bucket }}
+        OSS_ENDPOINT: ${{ inputs.oss-endpoint }}
+      run: |
+        bun -e "
+          const fs = require('fs');
+          const ver = process.env.APP_VERSION;
+          const endpoint = process.env.OSS_BUCKET + '.' + process.env.OSS_ENDPOINT;
+          const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+          pkg.version = ver;
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
+          tauri.version = ver;
+          tauri.plugins.updater.endpoints = ['https://' + endpoint + '/releases/latest.json'];
+          fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2) + '\n');
+        "
+
+    # ── 运行时目录 ──
+    - name: Prepare runtime directories
+      shell: bash
+      run: mkdir -p agents && touch agents/.gitkeep
