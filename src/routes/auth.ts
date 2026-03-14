@@ -5,9 +5,9 @@ import { getLogger } from '../logger/index.ts'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 
-// 官网地址：开发环境用 localhost:3002，生产环境用 youclaw.cc
+// 官网地址：开发环境用 localhost:3077，生产环境用 youclaw.cc
 function getWebsiteBaseUrl(): string {
-  return process.env.YOUCLAW_WEBSITE_URL || (process.env.NODE_ENV === 'production' ? 'https://youclaw.cc' : 'http://localhost:3002')
+  return process.env.YOUCLAW_WEBSITE_URL || (process.env.NODE_ENV === 'production' ? 'https://youclaw.dev' : 'http://localhost:3077')
 }
 
 // readmex.com API 地址
