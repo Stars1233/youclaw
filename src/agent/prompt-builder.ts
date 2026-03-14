@@ -27,10 +27,20 @@ export class PromptBuilder {
   ): string {
     const parts: string[] = []
 
+    // 记忆文件绝对路径
+    const agentMemoryDir = resolve(workspaceDir, 'memory')
+    const agentMemoryPath = resolve(agentMemoryDir, 'MEMORY.md')
+    const globalMemoryPath = resolve(getPaths().agents, '_global', 'memory', 'MEMORY.md')
+
     // 按顺序加载工作空间 MD 文件
     for (const filename of WORKSPACE_FILES) {
-      const content = this.loadMdFile(workspaceDir, filename)
+      let content = this.loadMdFile(workspaceDir, filename)
       if (content) {
+        // 替换记忆路径占位符为绝对路径
+        content = content
+          .replaceAll('{{agentMemoryDir}}', agentMemoryDir)
+          .replaceAll('{{agentMemoryPath}}', agentMemoryPath)
+          .replaceAll('{{globalMemoryPath}}', globalMemoryPath)
         parts.push(content)
       }
     }

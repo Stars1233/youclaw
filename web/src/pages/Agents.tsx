@@ -397,6 +397,9 @@ function AgentDetail({
   onDelete,
   subAgents,
   onSaveSubAgents,
+  browserProfiles,
+  agentBrowserProfile,
+  onSaveBrowserProfile,
 }: {
   t: ReturnType<typeof useI18n>['t']
   agent: Agent

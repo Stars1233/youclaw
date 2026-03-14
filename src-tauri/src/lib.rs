@@ -44,20 +44,80 @@ fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     env_vars.push(("PORT".into(), port.to_string()));
 
     if let Ok(store) = app.store("settings.json") {
-        if let Some(api_key) = store.get("api-key") {
-            if let Some(key) = api_key.as_str() {
-                if !key.is_empty() {
-                    env_vars.push(("ANTHROPIC_API_KEY".into(), key.to_string()));
+        // 读取 active-model 配置，决定模型来源
+        let mut model_configured = false;
+
+        if let Some(active_model) = store.get("active-model") {
+            let provider = active_model.get("provider").and_then(|v| v.as_str()).unwrap_or("");
+
+            match provider {
+                "builtin" => {
+                    // 内置模型：读取 builtin-model，映射到实际 model ID
+                    if let Some(builtin) = store.get("builtin-model") {
+                        if let Some(builtin_id) = builtin.as_str() {
+                            let actual_model = match builtin_id {
+                                "youclaw-pro" => "claude-sonnet-4-6",
+                                other => other,
+                            };
+                            env_vars.push(("AGENT_MODEL".into(), actual_model.to_string()));
+                            // 内置模型使用 YouClaw 默认 API（demo 占位）
+                            // TODO: 后续替换为 YouClaw 官方 API 端点
+                            model_configured = true;
+                        }
+                    }
+                }
+                "custom" => {
+                    // 自定义模型：从 custom-models 找到对应记录
+                    if let Some(custom_id) = active_model.get("id").and_then(|v| v.as_str()) {
+                        if let Some(custom_models) = store.get("custom-models") {
+                            if let Some(models) = custom_models.as_array() {
+                                for model in models {
+                                    if model.get("id").and_then(|v| v.as_str()) == Some(custom_id) {
+                                        if let Some(model_id) = model.get("modelId").and_then(|v| v.as_str()) {
+                                            if !model_id.is_empty() {
+                                                env_vars.push(("AGENT_MODEL".into(), model_id.to_string()));
+                                            }
+                                        }
+                                        if let Some(api_key) = model.get("apiKey").and_then(|v| v.as_str()) {
+                                            if !api_key.is_empty() {
+                                                env_vars.push(("ANTHROPIC_API_KEY".into(), api_key.to_string()));
+                                            }
+                                        }
+                                        if let Some(base_url) = model.get("baseUrl").and_then(|v| v.as_str()) {
+                                            if !base_url.is_empty() {
+                                                env_vars.push(("ANTHROPIC_BASE_URL".into(), base_url.to_string()));
+                                            }
+                                        }
+                                        model_configured = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // 兼容旧逻辑：如果 active-model 未配置，fallback 到原来的 api-key / base-url
+        if !model_configured {
+            if let Some(api_key) = store.get("api-key") {
+                if let Some(key) = api_key.as_str() {
+                    if !key.is_empty() {
+                        env_vars.push(("ANTHROPIC_API_KEY".into(), key.to_string()));
+                    }
+                }
+            }
+            if let Some(base_url) = store.get("base-url") {
+                if let Some(url) = base_url.as_str() {
+                    if !url.is_empty() {
+                        env_vars.push(("ANTHROPIC_BASE_URL".into(), url.to_string()));
+                    }
                 }
             }
         }
-        if let Some(base_url) = store.get("base-url") {
-            if let Some(url) = base_url.as_str() {
-                if !url.is_empty() {
-                    env_vars.push(("ANTHROPIC_BASE_URL".into(), url.to_string()));
-                }
-            }
-        }
+
         // Write port to store for frontend to read
         let _ = store.set("port", serde_json::Value::String(port.to_string()));
         let _ = store.save();

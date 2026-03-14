@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { GeneralPanel } from "./GeneralPanel"
+import { ModelsPanel } from "./ModelsPanel"
 import { AboutPanel } from "./AboutPanel"
 import { Skills } from "@/pages/Skills"
 import { Channels } from "@/pages/Channels"
@@ -11,7 +12,7 @@ import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useI18n } from "@/i18n"
 
-type Tab = "general" | "skills" | "channels" | "browser" | "logs" | "system" | "about"
+type Tab = "general" | "models" | "skills" | "channels" | "browser" | "logs" | "system" | "about"
 
 interface SettingsDialogProps {
   open: boolean
@@ -24,6 +25,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "general", label: t.settings.general },
+    { id: "models", label: t.settings.models },
     { id: "skills", label: t.nav.skills },
     { id: "channels", label: t.nav.channels },
     { id: "browser", label: t.nav.browser },
@@ -61,11 +63,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         {/* 内容区 */}
         <div className={cn(
           "flex-1 overflow-hidden",
-          currentTab === "general" || currentTab === "about"
+          currentTab === "general" || currentTab === "models" || currentTab === "about"
             ? "p-6 overflow-y-auto"
             : ""
         )}>
           {currentTab === "general" && <GeneralPanel />}
+          {currentTab === "models" && <ModelsPanel />}
           {currentTab === "skills" && <Skills />}
           {currentTab === "channels" && <Channels />}
           {currentTab === "browser" && <BrowserProfiles />}
