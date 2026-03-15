@@ -62,6 +62,9 @@ const envSchema = z.object({
   // 云服务地址（不配置则为离线模式）
   YOUCLAW_WEBSITE_URL: z.string().optional(),
   YOUCLAW_API_URL: z.string().optional(),
+  // 内置模型配置（编译时注入）
+  YOUCLAW_BUILTIN_API_URL: z.string().optional(),
+  YOUCLAW_BUILTIN_AUTH_TOKEN: z.string().optional(),
 })
 
 export type EnvConfig = z.infer<typeof envSchema>

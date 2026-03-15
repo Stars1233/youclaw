@@ -59,11 +59,15 @@ jobs:
         env:
           YOUCLAW_WEBSITE_URL: ${{ secrets.YOUCLAW_WEBSITE_URL }}
           YOUCLAW_API_URL: ${{ secrets.YOUCLAW_API_URL }}
+          YOUCLAW_BUILTIN_API_URL: ${{ secrets.YOUCLAW_BUILTIN_API_URL }}
+          YOUCLAW_BUILTIN_AUTH_TOKEN: ${{ secrets.YOUCLAW_BUILTIN_AUTH_TOKEN }}
         run: |
           mkdir -p src-tauri/bin
           DEFINES=""
           [ -n "$YOUCLAW_WEBSITE_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_WEBSITE_URL='$YOUCLAW_WEBSITE_URL'\""
           [ -n "$YOUCLAW_API_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_API_URL='$YOUCLAW_API_URL'\""
+          [ -n "$YOUCLAW_BUILTIN_API_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_BUILTIN_API_URL='$YOUCLAW_BUILTIN_API_URL'\""
+          [ -n "$YOUCLAW_BUILTIN_AUTH_TOKEN" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_BUILTIN_AUTH_TOKEN='$YOUCLAW_BUILTIN_AUTH_TOKEN'\""
           eval bun build --compile --target=${{ matrix.bun_target }} $DEFINES src/index.ts --outfile src-tauri/bin/youclaw-server-${{ matrix.sidecar_suffix }}
 
       - name: Import macOS certificates
@@ -125,11 +129,15 @@ jobs:
         env:
           YOUCLAW_WEBSITE_URL: ${{ secrets.YOUCLAW_WEBSITE_URL }}
           YOUCLAW_API_URL: ${{ secrets.YOUCLAW_API_URL }}
+          YOUCLAW_BUILTIN_API_URL: ${{ secrets.YOUCLAW_BUILTIN_API_URL }}
+          YOUCLAW_BUILTIN_AUTH_TOKEN: ${{ secrets.YOUCLAW_BUILTIN_AUTH_TOKEN }}
         run: |
           mkdir -p src-tauri/bin
           DEFINES=""
           [ -n "$YOUCLAW_WEBSITE_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_WEBSITE_URL='$YOUCLAW_WEBSITE_URL'\""
           [ -n "$YOUCLAW_API_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_API_URL='$YOUCLAW_API_URL'\""
+          [ -n "$YOUCLAW_BUILTIN_API_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_BUILTIN_API_URL='$YOUCLAW_BUILTIN_API_URL'\""
+          [ -n "$YOUCLAW_BUILTIN_AUTH_TOKEN" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_BUILTIN_AUTH_TOKEN='$YOUCLAW_BUILTIN_AUTH_TOKEN'\""
           eval bun build --compile --target=bun-windows-x64 $DEFINES src/index.ts --outfile src-tauri/bin/youclaw-server-x86_64-pc-windows-msvc.exe
 
       - name: Build Tauri app
@@ -275,11 +283,15 @@ jobs:
         env:
           YOUCLAW_WEBSITE_URL: ${{ secrets.YOUCLAW_WEBSITE_URL }}
           YOUCLAW_API_URL: ${{ secrets.YOUCLAW_API_URL }}
+          YOUCLAW_BUILTIN_API_URL: ${{ secrets.YOUCLAW_BUILTIN_API_URL }}
+          YOUCLAW_BUILTIN_AUTH_TOKEN: ${{ secrets.YOUCLAW_BUILTIN_AUTH_TOKEN }}
         run: |
           mkdir -p src-tauri/bin
           DEFINES=""
           [ -n "$YOUCLAW_WEBSITE_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_WEBSITE_URL='$YOUCLAW_WEBSITE_URL'\""
           [ -n "$YOUCLAW_API_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_API_URL='$YOUCLAW_API_URL'\""
+          [ -n "$YOUCLAW_BUILTIN_API_URL" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_BUILTIN_API_URL='$YOUCLAW_BUILTIN_API_URL'\""
+          [ -n "$YOUCLAW_BUILTIN_AUTH_TOKEN" ] && DEFINES="$DEFINES --define \"process.env.YOUCLAW_BUILTIN_AUTH_TOKEN='$YOUCLAW_BUILTIN_AUTH_TOKEN'\""
           eval bun build --compile --target=bun-linux-x64 $DEFINES src/index.ts --outfile src-tauri/bin/youclaw-server-x86_64-unknown-linux-gnu
 
       - name: Build Tauri app

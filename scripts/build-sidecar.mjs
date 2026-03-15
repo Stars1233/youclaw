@@ -35,7 +35,7 @@ function getCurrentTarget() {
 // 从环境变量生成 --define 参数，将值编译进 sidecar
 function getDefineArgs() {
   const defines = []
-  const envKeys = ['YOUCLAW_WEBSITE_URL', 'YOUCLAW_API_URL']
+  const envKeys = ['YOUCLAW_WEBSITE_URL', 'YOUCLAW_API_URL', 'YOUCLAW_BUILTIN_API_URL', 'YOUCLAW_BUILTIN_AUTH_TOKEN']
   for (const key of envKeys) {
     const val = process.env[key]
     if (val) {
