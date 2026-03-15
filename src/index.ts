@@ -174,11 +174,21 @@ async function main() {
   // 17. Create HTTP server
   const app = createApp({ agentManager, agentQueue, eventBus, router, channelManager, skillsLoader, registryManager, memoryManager, memoryIndexer, scheduler })
 
-  const server = Bun.serve({
-    fetch: app.fetch,
-    port: env.PORT,
-    hostname: '127.0.0.1',  // Listen on localhost only to avoid Windows firewall prompts
-  })
+  let server: ReturnType<typeof Bun.serve>
+  try {
+    server = Bun.serve({
+      fetch: app.fetch,
+      port: env.PORT,
+      hostname: '127.0.0.1',  // Listen on localhost only to avoid Windows firewall prompts
+    })
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('address already in use')) {
+      logger.error({ port: env.PORT }, `Port ${env.PORT} is already in use`)
+      console.error(`[PORT_CONFLICT] Port ${env.PORT} is already in use`)
+      process.exit(1)
+    }
+    throw err
+  }
 
   logger.info({ port: env.PORT }, `HTTP server started: http://localhost:${env.PORT}`)
   logger.info('YouClaw ready')

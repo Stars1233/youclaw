@@ -446,6 +446,19 @@ export async function getCreditTransactions(params?: { page?: number; limit?: nu
   return apiFetch<{ items: CreditTransaction[]; total: number }>(`/api/credit/transactions${q ? `?${q}` : ''}`)
 }
 
+// ===== Port Config API (Web mode) =====
+
+export async function getPortConfig() {
+  return apiFetch<{ port: string | null }>('/api/settings/port')
+}
+
+export async function setPortConfig(port: string | null) {
+  return apiFetch<{ ok: boolean }>('/api/settings/port', {
+    method: 'PUT',
+    body: JSON.stringify({ port }),
+  })
+}
+
 // ===== Settings API =====
 
 export interface CustomModelDTO {

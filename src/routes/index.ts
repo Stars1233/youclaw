@@ -47,7 +47,7 @@ export function createApp(deps: AppDeps) {
   app.use('/*', cors({
     origin: [
       'http://localhost:5173',
-      'http://localhost:3000',
+      'http://localhost:23107',
       'tauri://localhost',        // macOS Tauri WebView
       'http://tauri.localhost',   // Windows Tauri WebView
       'https://tauri.localhost',  // Linux Tauri WebView

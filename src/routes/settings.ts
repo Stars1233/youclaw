@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { getSettings, updateSettings, getActiveModelConfig } from '../settings/manager.ts'
+import { getDatabase } from '../db/index.ts'
 
 const app = new Hono()
 
@@ -64,6 +65,29 @@ app.get('/settings/active-model', (c) => {
     return c.json({ source: 'env' })
   }
   return c.json({ source: 'settings', ...config })
+})
+
+// GET /settings/port — 获取配置的端口（Web 模式）
+app.get('/settings/port', (c) => {
+  const db = getDatabase()
+  const row = db.query("SELECT value FROM kv_state WHERE key = 'preferred_port'").get() as { value: string } | null
+  return c.json({ port: row?.value || null })
+})
+
+// PUT /settings/port — 设置端口（Web 模式）
+app.put('/settings/port', async (c) => {
+  const { port } = await c.req.json() as { port?: string | null }
+  const db = getDatabase()
+  if (port) {
+    const num = parseInt(port)
+    if (isNaN(num) || num < 1024 || num > 65535) {
+      return c.json({ error: 'Port must be between 1024 and 65535' }, 400)
+    }
+    db.run("INSERT OR REPLACE INTO kv_state (key, value) VALUES ('preferred_port', ?)", [String(num)])
+  } else {
+    db.run("DELETE FROM kv_state WHERE key = 'preferred_port'")
+  }
+  return c.json({ ok: true })
 })
 
 export function createSettingsRoutes() {

@@ -1,8 +1,8 @@
 import { create } from "zustand"
 import { getItem, setItem } from "@/lib/storage"
 import { applyThemeToDOM, type Theme } from "@/hooks/useTheme"
-import { getAuthUser, getAuthStatus, getAuthLoginUrl, authLogout, getCreditBalance, getPayUrl, updateProfile as apiUpdateProfile, getCloudStatus, getSettings, updateSettings, type AuthUser } from "@/api/client"
-import { isTauri } from "@/api/transport"
+import { getAuthUser, getAuthStatus, getAuthLoginUrl, authLogout, getCreditBalance, getPayUrl, updateProfile as apiUpdateProfile, getCloudStatus, getSettings, updateSettings, getPortConfig, setPortConfig, type AuthUser } from "@/api/client"
+import { isTauri, getPortConflict } from "@/api/transport"
 import type { Locale } from "@/i18n/context"
 
 interface AppState {
@@ -16,6 +16,13 @@ interface AppState {
   toggleSidebar: () => void
   collapseSidebar: () => void
   expandSidebar: () => void
+
+  // Port
+  preferredPort: string | null
+  portConflict: string | null
+  setPreferredPort: (port: string | null) => Promise<void>
+  restartBackend: () => Promise<void>
+  clearPortConflict: () => void
 
   // Cloud
   cloudEnabled: boolean
@@ -68,6 +75,29 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ sidebarCollapsed: false })
     setItem("sidebar-collapsed", "false")
   },
+
+  // Port
+  preferredPort: null,
+  portConflict: null,
+
+  setPreferredPort: async (port) => {
+    if (isTauri) {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('set_preferred_port', { port })
+    } else {
+      await setPortConfig(port)
+    }
+    set({ preferredPort: port })
+  },
+
+  restartBackend: async () => {
+    if (!isTauri) return
+    set({ portConflict: null })
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('restart_sidecar')
+  },
+
+  clearPortConflict: () => set({ portConflict: null }),
 
   // Cloud
   cloudEnabled: false,
@@ -205,6 +235,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       sidebarCollapsed: sidebar === "true",
     })
     applyThemeToDOM(resolvedTheme)
+
+    // Read port config and conflict status
+    if (isTauri) {
+      const preferredPort = await getItem('preferredPort')
+      set({ preferredPort })
+    }
+    const conflict = getPortConflict()
+    if (conflict) {
+      set({ portConflict: conflict })
+    }
 
     // Check cloud service status & model configuration
     try {

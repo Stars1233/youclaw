@@ -10,9 +10,24 @@ export function getTauriInvoke(): (cmd: string, args?: Record<string, unknown>) 
 // Cache backend baseUrl to avoid repeated store reads
 let _cachedBaseUrl: string | null = null
 
+// 端口冲突状态
+let _portConflict: string | null = null
+
+export function getPortConflict(): string | null {
+  return _portConflict
+}
+
+export function clearPortConflict(): void {
+  _portConflict = null
+}
+
+export function updateCachedBaseUrl(url: string): void {
+  _cachedBaseUrl = url
+}
+
 /**
  * Get backend baseUrl
- * - Tauri mode: read port from store, default 3000
+ * - Tauri mode: read port from store, default 23107
  * - Web mode: empty string (uses Vite proxy)
  */
 export async function getBackendBaseUrl(): Promise<string> {
@@ -22,10 +37,10 @@ export async function getBackendBaseUrl(): Promise<string> {
   try {
     const { load } = await import('@tauri-apps/plugin-store')
     const store = await load('settings.json')
-    const port = (await store.get<string>('port')) || '3000'
+    const port = (await store.get<string>('port')) || '23107'
     _cachedBaseUrl = `http://localhost:${port}`
   } catch {
-    _cachedBaseUrl = 'http://localhost:3000'
+    _cachedBaseUrl = 'http://localhost:23107'
   }
   return _cachedBaseUrl
 }
@@ -36,7 +51,7 @@ export async function getBackendBaseUrl(): Promise<string> {
  */
 export function getBaseUrlSync(): string {
   if (!isTauri) return ''
-  return _cachedBaseUrl ?? 'http://localhost:3000'
+  return _cachedBaseUrl ?? 'http://localhost:23107'
 }
 
 /** Called once at app startup, waits for sidecar ready event before rendering */
@@ -56,6 +71,10 @@ export async function initBaseUrl(): Promise<void> {
           if (match) {
             _cachedBaseUrl = `http://localhost:${match[1]}`
           }
+          unlisten.then(fn => fn())
+          resolve()
+        } else if (event.payload.status === 'port-conflict') {
+          _portConflict = event.payload.message
           unlisten.then(fn => fn())
           resolve()
         } else if (event.payload.status === 'error') {
