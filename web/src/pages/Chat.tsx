@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Search, X, MoreHorizontal, Trash2 } from "lucide-react";
+import { Plus, Search, X, MoreHorizontal, Trash2, Palette, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useChatContext } from "@/hooks/chatCtx";
-import { groupChatsByDate, chatAvatar } from "@/lib/chat-utils";
+import { groupChatsByDate, resolveAvatar, PRESET_GRADIENTS } from "@/lib/chat-utils";
 import { ChatWelcome } from "@/components/chat/ChatWelcome";
 import { ChatMessages } from "@/components/chat/ChatMessages";
 import { ChatInput } from "@/components/chat/ChatInput";
@@ -11,8 +11,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +37,10 @@ export function Chat() {
   const isNewChat = !chatId && messages.length === 0;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (searchOpen) {
@@ -58,6 +67,23 @@ export function Chat() {
       await chatCtx.deleteChat(deleteTarget);
       setDeleteTarget(null);
     }
+  };
+
+  const handleStartEditName = (chatId: string, currentName: string) => {
+    setEditingChatId(chatId);
+    setEditingName(currentName);
+    setTimeout(() => editInputRef.current?.select(), 0);
+  };
+
+  const handleSaveEditName = async () => {
+    if (editingChatId && editingName.trim()) {
+      await chatCtx.updateChat(editingChatId, { name: editingName.trim() });
+    }
+    setEditingChatId(null);
+  };
+
+  const handleCancelEditName = () => {
+    setEditingChatId(null);
   };
 
   return (
@@ -152,14 +178,29 @@ export function Chat() {
                   onClick={() => chatCtx.loadChat(chat.chat_id)}
                 >
                   <div
-                    className="w-9 h-9 rounded-[10px] shrink-0 mt-0.5"
-                    style={{ background: chatAvatar(chat.chat_id) }}
+                    className="w-9 h-9 rounded-full shrink-0 mt-0.5"
+                    style={{ background: resolveAvatar(chat.avatar) }}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[13px] font-medium truncate flex-1 text-foreground">
-                        {chat.name}
-                      </span>
+                      {editingChatId === chat.chat_id ? (
+                        <input
+                          ref={editInputRef}
+                          className="text-[13px] font-medium flex-1 text-foreground bg-transparent border border-primary/40 rounded px-1 py-0 outline-none min-w-0"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveEditName();
+                            if (e.key === "Escape") handleCancelEditName();
+                          }}
+                          onBlur={handleSaveEditName}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span className="text-[13px] font-medium truncate flex-1 text-foreground">
+                          {chat.name}
+                        </span>
+                      )}
                       <div className="relative shrink-0">
                         <span className="text-[10px] text-muted-foreground group-hover:opacity-0 transition-opacity duration-200">
                           {new Date(chat.last_message_time).toLocaleTimeString(
@@ -179,6 +220,45 @@ export function Chat() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Palette className="h-3.5 w-3.5 mr-2" />
+                                  {t.chat.editAvatar}
+                                </DropdownMenuItem>
+                              </PopoverTrigger>
+                              <PopoverContent side="right" align="start" className="w-auto p-3">
+                                <div className="grid grid-cols-4 gap-2">
+                                  {PRESET_GRADIENTS.map((gradient, i) => (
+                                    <button
+                                      key={i}
+                                      className={cn(
+                                        "w-9 h-9 rounded-full transition-all",
+                                        chat.avatar === `gradient:${i}` ? "ring-2 ring-white ring-offset-2 ring-offset-background" : "hover:scale-110",
+                                      )}
+                                      style={{ background: gradient }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        chatCtx.updateChat(chat.chat_id, { avatar: `gradient:${i}` });
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartEditName(chat.chat_id, chat.name);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-2" />
+                              {t.chat.editTitle}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               data-testid="chat-item-delete"
                               className="text-destructive"
