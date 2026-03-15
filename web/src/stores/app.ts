@@ -84,6 +84,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ authLoading: true })
       const user = await getAuthUser()
+      // 后端未返回名称时，通过用户 id 拼一个默认用户名
+      if (!user.name) {
+        user.name = `User_${user.id.slice(0, 6)}`
+      }
+      // 后端未返回头像时，使用默认头像
+      if (!user.avatar) {
+        user.avatar = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user.name)}`
+      }
       set({ user, isLoggedIn: true, authLoading: false })
     } catch {
       set({ user: null, isLoggedIn: false, authLoading: false })
