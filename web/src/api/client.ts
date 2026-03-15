@@ -377,8 +377,9 @@ export async function getCloudStatus() {
   return apiFetch<{ enabled: boolean }>('/api/auth/cloud-status')
 }
 
-export async function getAuthLoginUrl() {
-  return apiFetch<{ loginUrl: string }>('/api/auth/login')
+export async function getAuthLoginUrl(platform?: string) {
+  const params = platform ? `?platform=${platform}` : ''
+  return apiFetch<{ loginUrl: string }>(`/api/auth/login${params}`)
 }
 
 export async function getAuthUser() {
@@ -393,8 +394,16 @@ export async function getAuthStatus() {
   return apiFetch<{ loggedIn: boolean }>('/api/auth/status')
 }
 
-export async function getPayUrl() {
-  return apiFetch<{ payUrl: string }>('/api/auth/pay-url')
+export async function getPayUrl(platform?: string) {
+  const params = platform ? `?platform=${platform}` : ''
+  return apiFetch<{ payUrl: string }>(`/api/auth/pay-url${params}`)
+}
+
+export async function saveAuthToken(token: string) {
+  return apiFetch<{ ok: boolean }>('/api/auth/save-token', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  })
 }
 
 export async function uploadFile(file: File): Promise<string> {

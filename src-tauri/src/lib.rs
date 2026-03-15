@@ -1,6 +1,6 @@
 use serde::Serialize;
 use tauri::{
-    AppHandle, Emitter, Manager,
+    AppHandle, Emitter, Listener, Manager,
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -216,6 +216,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(SidecarState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             get_version,
@@ -263,6 +264,22 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // 监听 deep link 事件，转发给前端
+            let dl_handle = handle.clone();
+            app.listen("deep-link://new-url", move |event: tauri::Event| {
+                if let Ok(urls) = serde_json::from_str::<Vec<String>>(event.payload()) {
+                    if let Some(url) = urls.first() {
+                        log::info!("Deep link received: {}", url);
+                        let _ = dl_handle.emit("deep-link-received", url.clone());
+                        // 将窗口拉到前台
+                        if let Some(win) = dl_handle.get_webview_window("main") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
+                    }
+                }
+            });
 
             // Start backend (dev mode uses beforeDevCommand, release mode uses sidecar)
             let app_handle = handle.clone();

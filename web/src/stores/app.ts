@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { getItem, setItem } from "@/lib/storage"
 import { applyThemeToDOM, type Theme } from "@/hooks/useTheme"
-import { getAuthUser, getAuthStatus, getAuthLoginUrl, authLogout, getCreditBalance, getPayUrl, updateProfile as apiUpdateProfile, getCloudStatus, getSettings, updateSettings, type AuthUser } from "@/api/client"
+import { getAuthUser, getAuthStatus, getAuthLoginUrl, authLogout, getCreditBalance, getPayUrl, updateProfile as apiUpdateProfile, getCloudStatus, getSettings, updateSettings, saveAuthToken, type AuthUser } from "@/api/client"
 import { isTauri } from "@/api/transport"
 import type { Locale } from "@/i18n/context"
 
@@ -100,35 +100,66 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   login: async () => {
     try {
-      const { loginUrl } = await getAuthLoginUrl()
-      // 用浏览器打开登录页
+      set({ authLoading: true })
+
       if (isTauri) {
+        // Tauri 模式：使用 deep link 回调
+        const { loginUrl } = await getAuthLoginUrl('tauri')
         const { openUrl } = await import('@tauri-apps/plugin-opener')
         await openUrl(loginUrl)
-      } else {
-        window.open(loginUrl, '_blank')
-      }
 
-      // 轮询等待登录完成
-      set({ authLoading: true })
-      const pollInterval = setInterval(async () => {
-        try {
-          const { loggedIn } = await getAuthStatus()
-          if (loggedIn) {
-            clearInterval(pollInterval)
-            await get().fetchUser()
-            await get().fetchCreditBalance()
+        // 监听 deep link 事件
+        const { listen } = await import('@tauri-apps/api/event')
+        let timeoutId: ReturnType<typeof setTimeout>
+        const unlisten = await listen<string>('deep-link-received', async (event) => {
+          try {
+            const url = new URL(event.payload)
+            if (url.host === 'auth' || url.pathname.startsWith('/auth/callback') || url.pathname.startsWith('auth/callback')) {
+              const token = url.searchParams.get('token')
+              if (token) {
+                await saveAuthToken(token)
+                await get().fetchUser()
+                await get().fetchCreditBalance()
+              }
+            }
+          } catch (err) {
+            console.error('Deep link auth failed:', err)
+          } finally {
+            unlisten()
+            clearTimeout(timeoutId)
+            set({ authLoading: false })
           }
-        } catch {
-          // 继续轮询
-        }
-      }, 2000)
+        })
 
-      // 60 秒超时
-      setTimeout(() => {
-        clearInterval(pollInterval)
-        set({ authLoading: false })
-      }, 60000)
+        // 120 秒超时
+        timeoutId = setTimeout(() => {
+          unlisten()
+          set({ authLoading: false })
+        }, 120000)
+      } else {
+        // Web 模式：保持轮询逻辑
+        const { loginUrl } = await getAuthLoginUrl()
+        window.open(loginUrl, '_blank')
+
+        const pollInterval = setInterval(async () => {
+          try {
+            const { loggedIn } = await getAuthStatus()
+            if (loggedIn) {
+              clearInterval(pollInterval)
+              await get().fetchUser()
+              await get().fetchCreditBalance()
+            }
+          } catch {
+            // 继续轮询
+          }
+        }, 2000)
+
+        // 60 秒超时
+        setTimeout(() => {
+          clearInterval(pollInterval)
+          set({ authLoading: false })
+        }, 60000)
+      }
     } catch (err) {
       console.error('Login failed:', err)
       set({ authLoading: false })
@@ -163,30 +194,51 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openPayPage: async () => {
     try {
-      const { payUrl } = await getPayUrl()
       if (isTauri) {
+        // Tauri 模式：使用 deep link 回调
+        const { payUrl } = await getPayUrl('tauri')
         const { openUrl } = await import('@tauri-apps/plugin-opener')
         await openUrl(payUrl)
-      } else {
-        window.open(payUrl, '_blank')
-      }
 
-      // 轮询检测余额变化
-      const oldBalance = get().creditBalance
-      const pollInterval = setInterval(async () => {
-        try {
-          const { balance } = await getCreditBalance()
-          if (balance !== oldBalance) {
-            clearInterval(pollInterval)
-            set({ creditBalance: balance })
+        // 监听 deep link 支付回调
+        const { listen } = await import('@tauri-apps/api/event')
+        let timeoutId: ReturnType<typeof setTimeout>
+        const unlisten = await listen<string>('deep-link-received', async (event) => {
+          try {
+            const url = new URL(event.payload)
+            if (url.host === 'pay' || url.pathname.startsWith('/pay/callback') || url.pathname.startsWith('pay/callback')) {
+              await get().fetchCreditBalance()
+            }
+          } catch {
+            // 忽略解析错误
+          } finally {
+            unlisten()
+            clearTimeout(timeoutId)
           }
-        } catch {
-          // 继续轮询
-        }
-      }, 3000)
+        })
 
-      // 120 秒超时停止轮询
-      setTimeout(() => clearInterval(pollInterval), 120000)
+        // 120 秒超时
+        timeoutId = setTimeout(() => unlisten(), 120000)
+      } else {
+        // Web 模式：保持轮询逻辑
+        const { payUrl } = await getPayUrl()
+        window.open(payUrl, '_blank')
+
+        const oldBalance = get().creditBalance
+        const pollInterval = setInterval(async () => {
+          try {
+            const { balance } = await getCreditBalance()
+            if (balance !== oldBalance) {
+              clearInterval(pollInterval)
+              set({ creditBalance: balance })
+            }
+          } catch {
+            // 继续轮询
+          }
+        }, 3000)
+
+        setTimeout(() => clearInterval(pollInterval), 120000)
+      }
     } catch (err) {
       console.error('Open pay page failed:', err)
     }

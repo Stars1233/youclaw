@@ -41,8 +41,10 @@ export function createAuthRoutes() {
     if (!websiteUrl) {
       return c.json({ error: 'Cloud service not configured' }, 501)
     }
-    const host = c.req.header('host') || `localhost:${getEnv().PORT}`
-    const redirectUri = `http://${host}/api/auth/callback`
+    const platform = c.req.query('platform')
+    const redirectUri = platform === 'tauri'
+      ? 'youclaw://auth/callback'
+      : `http://${c.req.header('host') || `localhost:${getEnv().PORT}`}/api/auth/callback`
     const loginUrl = `${websiteUrl}/login?redirect_uri=${encodeURIComponent(redirectUri)}&app_name=YouClaw`
     return c.json({ loginUrl })
   })
@@ -140,14 +142,28 @@ export function createAuthRoutes() {
     return c.json({ ok: true })
   })
 
+  // POST /auth/save-token — 前端通过 deep link 收到 token 后调用
+  app.post('/auth/save-token', async (c) => {
+    const body = await c.req.json() as { token?: string }
+    const logger = getLogger()
+    if (!body.token) {
+      return c.json({ error: 'Missing token' }, 400)
+    }
+    saveAuthToken(body.token)
+    logger.info({ category: 'auth' }, 'Auth token saved from deep link')
+    return c.json({ ok: true })
+  })
+
   // GET /auth/pay-url — 返回支付页 URL
   app.get('/auth/pay-url', (c) => {
     const websiteUrl = getEnv().YOUCLAW_WEBSITE_URL
     if (!websiteUrl) {
       return c.json({ error: 'Cloud service not configured' }, 501)
     }
-    const host = c.req.header('host') || `localhost:${getEnv().PORT}`
-    const redirectUri = `http://${host}/api/auth/pay-callback`
+    const platform = c.req.query('platform')
+    const redirectUri = platform === 'tauri'
+      ? 'youclaw://pay/callback'
+      : `http://${c.req.header('host') || `localhost:${getEnv().PORT}`}/api/auth/pay-callback`
     const payUrl = `${websiteUrl}/pay?redirect_uri=${encodeURIComponent(redirectUri)}`
     return c.json({ payUrl })
   })

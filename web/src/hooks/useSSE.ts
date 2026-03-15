@@ -8,6 +8,7 @@ type SSEEvent = {
   text?: string
   fullText?: string
   error?: string
+  errorCode?: string
   isProcessing?: boolean
   tool?: string
   input?: string

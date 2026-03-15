@@ -8,6 +8,7 @@ import { ChatWelcome } from "@/components/chat/ChatWelcome";
 import { ChatMessages } from "@/components/chat/ChatMessages";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { SidePanel } from "@/components/layout/SidePanel";
+import { InsufficientCreditsDialog } from "@/components/chat/InsufficientCreditsDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -366,6 +367,12 @@ export function Chat() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 积分不足充值弹窗 */}
+      <InsufficientCreditsDialog
+        open={chatCtx.showInsufficientCredits}
+        onOpenChange={chatCtx.setShowInsufficientCredits}
+      />
     </div>
   );
 }

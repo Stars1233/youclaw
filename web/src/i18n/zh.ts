@@ -307,6 +307,12 @@ export const zh: Translations = {
     saveSuccess: '保存成功',
     saveFailed: '保存失败',
   },
+  insufficientCredits: {
+    title: '积分不足',
+    description: '您的积分余额不足，无法完成本次请求。请充值后继续使用。',
+    currentBalance: '当前余额：',
+    topUp: '立即充值',
+  },
   browser: {
     title: '浏览器 Profile',
     noProfiles: '暂无浏览器 Profile',

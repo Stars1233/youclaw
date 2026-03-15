@@ -6,11 +6,13 @@ import { getEnv } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
 import { getSession, saveSession } from '../db/index.ts'
 import type { EventBus } from '../events/index.ts'
+import { ErrorCode } from '../events/types.ts'
 import type { PromptBuilder } from './prompt-builder.ts'
 import type { AgentCompiler } from './compiler.ts'
 import type { HooksManager } from './hooks.ts'
 import { resolveMcpServers } from './mcp-utils.ts'
 import { getActiveModelConfig } from '../settings/manager.ts'
+import { getAuthToken } from '../routes/auth.ts'
 import type { AgentConfig, ProcessParams } from './types.ts'
 
 // 解析 claude-agent-sdk cli.js 路径
@@ -119,7 +121,18 @@ export class AgentRuntime {
         }
         logger.info({ provider: modelConfig.provider, model, baseUrl: modelConfig.baseUrl || '(default)' }, '模型配置已加载')
       } else {
-        logger.info({ model, baseUrl: process.env.ANTHROPIC_BASE_URL || '(default)' }, '使用环境变量模型配置')
+        // 切回内置模型时，清除之前自定义模型设置的环境变量，避免 SDK 继续使用旧配置
+        if (env.ANTHROPIC_API_KEY) {
+          process.env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY
+        }
+        delete process.env.ANTHROPIC_BASE_URL
+        logger.info({ model }, '使用环境变量模型配置')
+      }
+
+      // 将用户 auth token 注入到 SDK 请求 header 中
+      const authToken = getAuthToken()
+      if (authToken) {
+        process.env.ANTHROPIC_CUSTOM_HEADERS = `rdxtoken: ${authToken}`
       }
 
       const { fullText, sessionId } = await this.executeQuery(
@@ -180,7 +193,7 @@ export class AgentRuntime {
       logger.error({ agentId, chatId, error: rawError, durationMs: Date.now() - startTime, category: 'agent' }, '消息处理失败')
 
       // 将 SDK 内部错误转为用户友好提示
-      const userError = this.humanizeError(rawError)
+      const { message: userError, errorCode } = this.humanizeError(rawError)
 
       // on_error hook
       if (this.hooksManager) {
@@ -197,6 +210,7 @@ export class AgentRuntime {
         agentId,
         chatId,
         error: userError,
+        errorCode,
       })
 
       return `Error: ${userError}`
@@ -473,26 +487,30 @@ export class AgentRuntime {
   }
 
   /**
-   * 将 SDK 内部错误转为用户可读的提示
+   * 将 SDK 内部错误转为用户可读的提示，同时返回错误码
    */
-  private humanizeError(raw: string): string {
+  private humanizeError(raw: string): { message: string; errorCode: ErrorCode } {
     // SDK 进程崩溃（通常是 API key/网络/模型配置问题）
     if (/process exited with code/i.test(raw)) {
-      return 'Model connection failed. Please check your model configuration (API Key, Base URL) in Settings → Models.'
+      return { message: 'Model connection failed. Please check your model configuration (API Key, Base URL) in Settings → Models.', errorCode: ErrorCode.MODEL_CONNECTION_FAILED }
     }
     // API 认证失败
     if (/401|unauthorized|authentication/i.test(raw)) {
-      return 'Model authentication failed. Please check your API Key in Settings → Models.'
+      return { message: 'Model authentication failed. Please check your API Key in Settings → Models.', errorCode: ErrorCode.AUTH_FAILED }
     }
     // 网络错误
     if (/ECONNREFUSED|ENOTFOUND|fetch failed|network/i.test(raw)) {
-      return 'Cannot reach the model API. Please check your network connection and Base URL.'
+      return { message: 'Cannot reach the model API. Please check your network connection and Base URL.', errorCode: ErrorCode.NETWORK_ERROR }
     }
-    // 余额不足
+    // 余额/积分不足
     if (/insufficient|credit|balance|quota/i.test(raw)) {
-      return 'Insufficient credits or API quota. Please check your account balance.'
+      return { message: 'Insufficient credits or API quota. Please check your account balance.', errorCode: ErrorCode.INSUFFICIENT_CREDITS }
     }
-    return raw
+    // 频率限制
+    if (/rate.?limit|too many requests|429/i.test(raw)) {
+      return { message: 'Request rate limited. Please try again later.', errorCode: ErrorCode.RATE_LIMITED }
+    }
+    return { message: raw, errorCode: ErrorCode.UNKNOWN }
   }
 
   // --- Emit 辅助方法 ---

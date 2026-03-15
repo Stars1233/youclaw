@@ -60,6 +60,11 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["youclaw"]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://UPDATER_ENDPOINT_PLACEHOLDER/releases/latest.json",

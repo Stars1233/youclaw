@@ -305,6 +305,12 @@ export const en = {
     saveSuccess: 'Saved',
     saveFailed: 'Save failed',
   },
+  insufficientCredits: {
+    title: 'Insufficient Credits',
+    description: 'Your credit balance is insufficient to complete this request. Please top up to continue using the service.',
+    currentBalance: 'Current balance: ',
+    topUp: 'Top Up Now',
+  },
   browser: {
     title: 'Browser Profiles',
     noProfiles: 'No browser profiles yet',

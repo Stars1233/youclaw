@@ -17,6 +17,8 @@ export interface ChatContextType {
   loadChat: (chatId: string) => Promise<void>
   newChat: () => void
   stop: () => void
+  showInsufficientCredits: boolean
+  setShowInsufficientCredits: (show: boolean) => void
 
   chatList: ChatItem[]
   refreshChats: () => void
