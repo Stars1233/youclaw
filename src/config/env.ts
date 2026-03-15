@@ -77,6 +77,14 @@ export function loadEnv(): EnvConfig {
   // Node.js/tsx 不会自动加载 .env，需要手动加载
   loadDotEnv()
 
+  // bun build --define 会把 process.env.XXX 替换为字符串字面量
+  // 但 Zod safeParse(process.env) 是读 process.env 对象，读不到被替换的值
+  // 所以需要显式引用每个编译时常量，写回 process.env 对象
+  if (process.env.YOUCLAW_WEBSITE_URL) process.env.YOUCLAW_WEBSITE_URL = process.env.YOUCLAW_WEBSITE_URL
+  if (process.env.YOUCLAW_API_URL) process.env.YOUCLAW_API_URL = process.env.YOUCLAW_API_URL
+  if (process.env.YOUCLAW_BUILTIN_API_URL) process.env.YOUCLAW_BUILTIN_API_URL = process.env.YOUCLAW_BUILTIN_API_URL
+  if (process.env.YOUCLAW_BUILTIN_AUTH_TOKEN) process.env.YOUCLAW_BUILTIN_AUTH_TOKEN = process.env.YOUCLAW_BUILTIN_AUTH_TOKEN
+
   const result = envSchema.safeParse(process.env)
   if (!result.success) {
     console.error('环境变量校验失败:')

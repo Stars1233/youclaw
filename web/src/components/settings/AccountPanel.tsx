@@ -14,7 +14,7 @@ import {
 import { useI18n } from "@/i18n"
 import { useAppStore } from "@/stores/app"
 import { getCreditTransactions, uploadFile, type CreditTransaction } from "@/api/client"
-import { LogIn, LogOut, Coins, ExternalLink, ChevronRight, Pencil, Camera, Check, X, Loader2 } from "lucide-react"
+import { LogIn, LogOut, Coins, ExternalLink, ChevronRight, Pencil, Camera, Check, X, Loader2, Sparkles } from "lucide-react"
 
 export function AccountPanel() {
   const { t } = useI18n()
@@ -135,23 +135,23 @@ export function AccountPanel() {
 
   return (
     <div className="space-y-8">
-      {/* 用户信息 */}
-      <div className="flex items-center gap-5">
-        <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
+      {/* 用户信息 — 参考设计：大头像 + 用户名/邮箱/徽章 */}
+      <div className="flex items-center gap-6">
+        <div className="relative group cursor-pointer shrink-0" onClick={handleAvatarClick}>
           {uploadingAvatar ? (
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
-              <Loader2 size={20} className="animate-spin text-muted-foreground" />
+            <div className="w-24 h-24 rounded-3xl bg-muted flex items-center justify-center">
+              <Loader2 size={24} className="animate-spin text-muted-foreground" />
             </div>
           ) : user?.avatar ? (
-            <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-2xl object-cover" />
+            <img src={user.avatar} alt={user.name} className="w-24 h-24 rounded-3xl object-cover shadow-xl" />
           ) : (
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-2xl font-bold text-primary-foreground shadow-lg">
+            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-3xl font-bold text-primary-foreground shadow-xl">
               {user?.name?.[0]?.toUpperCase() ?? '?'}
             </div>
           )}
           {/* 头像悬浮遮罩 */}
-          <div className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Camera size={18} className="text-white" />
+          <div className="absolute inset-0 rounded-3xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Camera size={20} className="text-white" />
           </div>
           <input
             ref={fileInputRef}
@@ -184,7 +184,7 @@ export function AccountPanel() {
             </div>
           ) : (
             <div className="flex items-center gap-2 group/name">
-              <div className="text-lg font-semibold truncate">{user?.name}</div>
+              <h4 className="text-xl font-bold truncate">{user?.name}</h4>
               <button
                 onClick={handleStartEditName}
                 className="opacity-0 group-hover/name:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
@@ -193,15 +193,19 @@ export function AccountPanel() {
               </button>
             </div>
           )}
-          {user?.email && <div className="text-sm text-muted-foreground truncate">{user.email}</div>}
+          {user?.email && <p className="text-sm text-muted-foreground truncate mt-0.5">{user.email}</p>}
+          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-primary/15 text-primary rounded-full text-[10px] font-bold uppercase tracking-wider">
+            <Sparkles size={10} />
+            Pro Member
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setLogoutOpen(true)} className="gap-1.5 rounded-xl">
+        <Button variant="outline" size="sm" onClick={() => setLogoutOpen(true)} className="gap-1.5 rounded-xl shrink-0">
           <LogOut size={14} />
           {t.account.logout}
         </Button>
       </div>
 
-      {/* 积分余额 */}
+      {/* 积分余额 — 独立卡片 */}
       <div className="rounded-2xl border-2 border-border p-5">
         <div className="flex items-center justify-between">
           <div>

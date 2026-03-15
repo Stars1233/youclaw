@@ -26,7 +26,7 @@ interface ActiveModel {
 
 export function ModelsPanel() {
   const { t } = useI18n()
-  const { creditBalance, cloudEnabled } = useAppStore()
+  const { cloudEnabled } = useAppStore()
   const [builtinModel, setBuiltinModel] = useState("youclaw-pro")
   const [customModels, setCustomModels] = useState<CustomModelDTO[]>([])
   const [activeModel, setActiveModel] = useState<ActiveModel>({ provider: "builtin" })
@@ -223,7 +223,7 @@ export function ModelsPanel() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold">{t.settings.builtinProvider}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {`${t.settings.cloudDesc}${creditBalance != null ? ` · ${creditBalance}` : ''}`}
+                  {t.settings.cloudDesc}
                 </div>
               </div>
               {(activeModel.provider === "builtin" || activeModel.provider === "cloud") && (

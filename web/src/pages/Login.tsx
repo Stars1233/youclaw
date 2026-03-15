@@ -89,7 +89,7 @@ export function Login() {
             <img
               src={logoUrl}
               alt="YouClaw Logo"
-              className="w-28 h-28 mx-auto rounded-3xl shadow-lg border border-border/50"
+              className="w-28 h-28 p-3 mx-auto rounded-3xl shadow-lg border border-border/50 bg-white"
             />
           </div>
           <h1 className="mt-6 text-2xl font-bold text-foreground tracking-tight">YouClaw</h1>
