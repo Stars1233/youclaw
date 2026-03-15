@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Bot, Copy, Check } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Copy, Check } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Message as AIMessage,
   MessageContent,
@@ -26,8 +26,9 @@ export function AssistantMessage({ message }: { message: Message }) {
     <AIMessage from="assistant" data-testid="message-assistant">
       <div className="group flex gap-3 py-3">
         <Avatar className="h-8 w-8 mt-0.5">
+          <AvatarImage src="/icon.svg" alt="YouClaw" />
           <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
-            <Bot className="h-4 w-4" />
+            AI
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">

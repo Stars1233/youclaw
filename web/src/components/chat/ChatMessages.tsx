@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { Loader2, Bot } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Loader2 } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Conversation,
   ConversationContent,
@@ -36,8 +36,9 @@ export function ChatMessages() {
           <AIMessage from="assistant">
             <div className="flex gap-3 py-3">
               <Avatar className="h-8 w-8 mt-0.5">
+                <AvatarImage src="/icon.svg" alt="YouClaw" />
                 <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
-                  <Bot className="h-4 w-4" />
+                  AI
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
@@ -52,8 +53,9 @@ export function ChatMessages() {
           <AIMessage from="assistant">
             <div className="flex gap-3 py-3">
               <Avatar className="h-8 w-8 mt-0.5">
+                <AvatarImage src="/icon.svg" alt="YouClaw" />
                 <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
-                  <Bot className="h-4 w-4" />
+                  AI
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
@@ -70,8 +72,9 @@ export function ChatMessages() {
         {isProcessing && !streamingText && pendingToolUse.length === 0 && (
           <div className="flex gap-3 py-3">
             <Avatar className="h-8 w-8 mt-0.5">
+              <AvatarImage src="/icon.svg" alt="YouClaw" />
               <AvatarFallback className="bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-[10px] font-semibold">
-                <Bot className="h-4 w-4" />
+                AI
               </AvatarFallback>
             </Avatar>
             <div className="flex items-center gap-2 text-muted-foreground text-sm pt-2">
