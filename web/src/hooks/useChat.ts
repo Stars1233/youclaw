@@ -17,6 +17,7 @@ export type Message = {
   timestamp: string
   toolUse?: ToolUseItem[]
   attachments?: Attachment[]
+  errorCode?: string
 }
 
 export function useChat(agentId: string) {
@@ -33,6 +34,8 @@ export function useChat(agentId: string) {
 
   // Track last SSE event time for timeout fallback
   const lastEventTimeRef = useRef<number>(0)
+  // 标记 SSE 已经处理过错误，防止 send() catch 重复添加消息
+  const sseErrorHandledRef = useRef(false)
 
   const { close: closeSSE } = useSSE(chatId, (event) => {
     lastEventTimeRef.current = Date.now()
@@ -68,14 +71,20 @@ export function useChat(agentId: string) {
         setIsProcessing(event.isProcessing ?? false)
         break
       case 'error':
+        sseErrorHandledRef.current = true
         setChatStatus('error')
         setTimeout(() => setChatStatus('ready'), 2000)
-        // Show insufficient credits dialog when balance is low
         if (event.errorCode === 'INSUFFICIENT_CREDITS') {
           setShowInsufficientCredits(true)
-        }
-        // Show error to user instead of silently swallowing it
-        if (event.error) {
+          // 积分不足：用 errorCode 标记，由 AssistantMessage 渲染国际化内容
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: '',
+            timestamp: new Date().toISOString(),
+            errorCode: 'INSUFFICIENT_CREDITS',
+          }])
+        } else if (event.error) {
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'assistant',
@@ -130,7 +139,15 @@ export function useChat(agentId: string) {
     else setChatStatus('ready')
   }, [isProcessing, streamingText, chatStatus])
 
-  const send = useCallback(async (prompt: string, browserProfileId?: string, attachments?: Attachment[]) => {    // Add user message to the list
+  const send = useCallback(async (prompt: string, browserProfileId?: string, attachments?: Attachment[]) => {
+    // Pre-generate chatId for new chats so SSE connects before sendMessage,
+    // avoiding race condition where error events fire before EventSource is ready
+    const effectiveChatId = chatId ?? `web:${crypto.randomUUID()}`
+    if (!chatId) {
+      setChatId(effectiveChatId)
+    }
+
+    // Add user message to the list
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
       role: 'user',
@@ -140,21 +157,40 @@ export function useChat(agentId: string) {
     }])
     setIsProcessing(true)
     setStreamingText('')
+    sseErrorHandledRef.current = false
+
+    // Wait for React render + EventSource connection before sending
+    if (!chatId) {
+      await new Promise(r => setTimeout(r, 100))
+    }
 
     try {
-      const result = await sendMessage(agentId, prompt, chatId ?? undefined, browserProfileId, attachments)
-      if (!chatId) {
-        setChatId(result.chatId)
-      }
+      await sendMessage(agentId, prompt, effectiveChatId, browserProfileId, attachments)
     } catch (err) {
-      // Show error and reset state on request failure
+      // SSE 已经处理过错误，跳过避免重复消息
+      if (sseErrorHandledRef.current) {
+        sseErrorHandledRef.current = false
+        return
+      }
       const errorMsg = err instanceof Error ? err.message : String(err)
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `⚠️ ${errorMsg}`,
-        timestamp: new Date().toISOString(),
-      }])
+      const isCredits = /insufficient|credit|balance|quota/i.test(errorMsg)
+      if (isCredits) {
+        setShowInsufficientCredits(true)
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+          errorCode: 'INSUFFICIENT_CREDITS',
+        }])
+      } else {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `⚠️ ${errorMsg}`,
+          timestamp: new Date().toISOString(),
+        }])
+      }
       setIsProcessing(false)
     }
   }, [agentId, chatId])
