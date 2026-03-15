@@ -328,7 +328,7 @@ export function Chat() {
               <img
                 src="/icon.svg"
                 alt="YouClaw"
-                className="h-24 w-24 mb-3 mx-auto"
+                className="h-24 w-24 mb-3 mx-auto transition-transform duration-300 ease-out hover:scale-110 hover:rotate-3"
               />
               <h1 className="text-2xl font-semibold tracking-tight">
                 {t.chat.welcome}
