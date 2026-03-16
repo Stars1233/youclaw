@@ -39,6 +39,7 @@ import { Input } from '../components/ui/input'
 import { cn } from '../lib/utils'
 import { useI18n } from '../i18n'
 import { SidePanel } from '@/components/layout/SidePanel'
+import { useDragRegion } from "@/hooks/useDragRegion"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 
 const sourceOrder: Skill['source'][] = ['workspace', 'builtin', 'user']
@@ -60,6 +61,7 @@ function EligibilityIcon({ skill }: { skill: Skill }) {
 
 export function Skills() {
   const { t } = useI18n()
+  const drag = useDragRegion()
   const [tab, setTab] = useState<TabType>('installed')
   const [skills, setSkills] = useState<Skill[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -202,7 +204,7 @@ export function Skills() {
         <div className="flex flex-1 min-h-0">
           {/* Left panel: skill list */}
           <SidePanel>
-            <div className="h-12 shrink-0 px-3 border-b border-border flex items-center">
+            <div className="h-12 shrink-0 px-3 border-b border-border flex items-center" {...drag}>
               <h2 className="font-semibold text-sm">{t.skills.title}</h2>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-3">
