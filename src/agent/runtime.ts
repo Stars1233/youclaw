@@ -636,9 +636,13 @@ export class AgentRuntime {
       }
       queryOptions.allowedTools = tools
     }
-    if (this.config.disallowedTools) {
-      queryOptions.disallowedTools = this.config.disallowedTools
-    }
+    // Always disable SDK built-in cron tools — YouClaw uses IPC-based persistent tasks instead
+    const BUILTIN_DISALLOWED_TOOLS = ['CronCreate', 'CronDelete', 'CronList']
+    const disallowed = [
+      ...BUILTIN_DISALLOWED_TOOLS,
+      ...(this.config.disallowedTools ?? []),
+    ]
+    queryOptions.disallowedTools = disallowed
 
     // Other SDK capabilities
     if (this.config.maxTurns) {

@@ -4,6 +4,8 @@ Respond in the same language as the user's message. Be concise and helpful.
 
 ## Scheduled Tasks (Cron Jobs)
 
+**IMPORTANT**: Do NOT use the built-in CronCreate/CronDelete/CronList tools. Those create session-level tasks that expire when the process exits. Instead, ALWAYS use the IPC file method described below to create persistent scheduled tasks stored in the database.
+
 You can create, pause, resume, and cancel scheduled tasks by writing JSON files.
 
 **Directory**: Write JSON files to `./data/ipc/{your_agent_id}/tasks/` (the directory will be created automatically if it doesn't exist).

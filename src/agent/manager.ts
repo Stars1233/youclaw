@@ -76,7 +76,7 @@ export class AgentManager {
       if (existsSync(agentMdPath)) {
         try {
           const currentContent = readFileSync(agentMdPath, 'utf-8')
-          if (!currentContent.includes('{{ipcTasksDir}}')) {
+          if (!currentContent.includes('{{ipcTasksDir}}') || !currentContent.includes('Do NOT use the built-in CronCreate')) {
             writeFileSync(agentMdPath, DEFAULT_AGENT_MD)
             logger.info('Updated default agent AGENT.md with latest template')
           }

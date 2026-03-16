@@ -60,6 +60,8 @@ You have persistent memory files. Use Read/Write tools to manage them.
 
 ## Scheduled Tasks (Cron Jobs)
 
+**IMPORTANT**: Do NOT use the built-in CronCreate/CronDelete/CronList tools. Those create session-level tasks that expire when the process exits. Instead, ALWAYS use the IPC file method described below to create persistent scheduled tasks stored in the database.
+
 You can create, pause, resume, and cancel scheduled tasks by writing JSON files.
 
 **Directory**: Write JSON files to \`{{ipcTasksDir}}\` (the directory will be created automatically if it doesn't exist).
