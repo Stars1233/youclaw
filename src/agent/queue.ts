@@ -145,6 +145,16 @@ export class AgentQueue {
 
       // Race against timeout to prevent stuck queue
       const timeoutMs = AgentQueue.PROCESS_TIMEOUT_MS
+      const processStartTime = Date.now()
+      logger.debug({
+        agentId: item.agentId,
+        chatId: item.chatId,
+        chatKey,
+        timeoutMs,
+        promptLength: item.prompt.length,
+        hasAttachments: !!(item.attachments && item.attachments.length > 0),
+        category: 'queue',
+      }, 'Starting queue item processing with timeout')
       const result = await Promise.race([
         managed.runtime.process({
           chatId: item.chatId,
@@ -155,7 +165,18 @@ export class AgentQueue {
           attachments: item.attachments,
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Request timed out after 5 minutes. The model may be unreachable.')), timeoutMs),
+          setTimeout(() => {
+            const elapsedMs = Date.now() - processStartTime
+            logger.error({
+              agentId: item.agentId,
+              chatId: item.chatId,
+              chatKey,
+              timeoutMs,
+              elapsedMs,
+              category: 'queue',
+            }, 'Queue item timed out — the model may be unreachable or the request is stuck')
+            reject(new Error('Request timed out after 5 minutes. The model may be unreachable.'))
+          }, timeoutMs),
         ),
       ])
 
