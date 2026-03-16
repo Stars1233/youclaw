@@ -506,6 +506,9 @@ jobs:
           # Upload latest.json to fixed path for updater
           ossutil cp latest.json "oss://${OSS_BUCKET}/youclaw/releases/latest.json" -f
 
+          # Also upload to GitHub Release as fallback
+          gh release upload "$TAG" latest.json -R "$REPO" --clobber
+
       - name: Notify Feishu
         if: always()
         uses: ./.github/actions/notify-feishu
