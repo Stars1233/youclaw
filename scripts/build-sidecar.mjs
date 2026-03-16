@@ -9,7 +9,7 @@
  */
 
 import { execSync } from 'node:child_process'
-import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, unlinkSync, writeFileSync, copyFileSync, chmodSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -93,6 +93,25 @@ if (buildAll) {
   console.log(`Building sidecar for current platform (${currentTarget})...\n`)
   build(currentTarget, name)
 }
+
+// Copy Bun runtime binary into resources for embedding in Tauri bundle
+function copyBunRuntime() {
+  const bunRuntimeDir = resolve(root, 'src-tauri', 'resources', 'bun-runtime')
+  mkdirSync(bunRuntimeDir, { recursive: true })
+
+  // Get current bun executable path
+  const bunPath = execSync('which bun', { encoding: 'utf-8' }).trim()
+
+  // Platform-specific naming
+  const ext = process.platform === 'win32' ? '.exe' : ''
+  const outPath = resolve(bunRuntimeDir, `bun${ext}`)
+
+  copyFileSync(bunPath, outPath)
+  chmodSync(outPath, 0o755)
+  console.log(`Copied Bun runtime: ${bunPath} → ${outPath}`)
+}
+
+copyBunRuntime()
 
 // 清理 bun build --compile 产生的临时文件
 for (const f of readdirSync(root)) {

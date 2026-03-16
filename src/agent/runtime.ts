@@ -1,7 +1,7 @@
 import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
-import { existsSync, copyFileSync, mkdirSync, statSync } from 'node:fs'
+import { existsSync, copyFileSync, mkdirSync, statSync, chmodSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { getEnv } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
@@ -119,11 +119,9 @@ function validateCliExecutable(cliPath: string): void {
   }
 
   // Quick spawn test: verify the CLI can at least start
-  // In Tauri bundled mode, process.execPath is the compiled sidecar binary —
-  // using it to run cli.js would launch the whole server again and fail with EADDRINUSE.
-  // Fall back to 'bun' (same logic as executeQuery).
-  const isBundled = process.execPath.includes('.app/') || process.execPath.includes('youclaw-server')
-  const runtime = isBundled ? 'bun' : process.execPath
+  // Uses resolveRuntimeExecutable() which returns embedded bun if available,
+  // falling back to system bun or process.execPath in dev mode.
+  const runtime = resolveRuntimeExecutable()
   try {
     execSync(`"${runtime}" "${cliPath}" --help`, { timeout: 5000, encoding: 'utf-8', stdio: 'pipe' })
     safeLog('info', 'SDK cli.js validation passed', { cliPath, runtime })
@@ -171,6 +169,76 @@ function detectSystemProxy(): void {
     })
   }
   safeLog('info', 'No system proxy detected')
+}
+
+/**
+ * Ensure Bun runtime is available for SDK subprocess.
+ * In bundled mode, extracts embedded Bun from resources to DATA_DIR/bun-runtime/.
+ * Returns the resolved path to the bun executable, or null if not needed / unavailable.
+ */
+export function ensureBunRuntime(): string | null {
+  const isBundled = process.execPath.includes('.app/') || process.execPath.includes('youclaw-server')
+  if (!isBundled) return null  // Dev mode: use process.execPath directly
+
+  const dataDir = process.env.DATA_DIR
+  if (!dataDir) return null
+
+  const ext = process.platform === 'win32' ? '.exe' : ''
+  const targetDir = resolve(dataDir, 'bun-runtime')
+  const targetPath = resolve(targetDir, `bun${ext}`)
+
+  // Already extracted?
+  if (existsSync(targetPath)) {
+    _bunRuntimePath = targetPath
+    return targetPath
+  }
+
+  // Try to extract from resources
+  const resourcesDir = process.env.RESOURCES_DIR
+  if (resourcesDir) {
+    // Tauri 2 converts ../ to _up_/, so the bun-runtime dir could be at multiple locations
+    const candidates = [
+      resolve(resourcesDir, '_up_/src-tauri/resources/bun-runtime', `bun${ext}`),
+      resolve(resourcesDir, 'bun-runtime', `bun${ext}`),
+    ]
+    for (const src of candidates) {
+      if (existsSync(src)) {
+        mkdirSync(targetDir, { recursive: true })
+        copyFileSync(src, targetPath)
+        chmodSync(targetPath, 0o755)
+        // macOS: strip quarantine
+        if (process.platform === 'darwin') {
+          try { execSync(`xattr -d com.apple.quarantine "${targetPath}"`, { timeout: 5000 }) } catch {}
+        }
+        safeLog('info', 'Extracted embedded Bun runtime', { src, dst: targetPath })
+        _bunRuntimePath = targetPath
+        return targetPath
+      }
+    }
+  }
+
+  // No embedded runtime found
+  safeLog('warn', 'No embedded Bun runtime in resources')
+  return null
+}
+
+// Module-level cache set by ensureBunRuntime() or lazy init
+let _bunRuntimePath: string | null | undefined = undefined
+
+function resolveRuntimeExecutable(): string {
+  const isBundled = process.execPath.includes('.app/') || process.execPath.includes('youclaw-server')
+  if (!isBundled) return process.execPath
+
+  // Use cached embedded bun path
+  if (_bunRuntimePath === undefined) {
+    _bunRuntimePath = ensureBunRuntime()
+  }
+  if (_bunRuntimePath && existsSync(_bunRuntimePath)) {
+    return _bunRuntimePath
+  }
+
+  // Fallback: system bun
+  return 'bun'
 }
 
 // Deferred startup checks — run once on first executeQuery() call
@@ -528,11 +596,9 @@ export class AgentRuntime {
     const cliPath = resolveCliPath()
     ensureStartupChecks(cliPath)
     // Determine JS runtime executable for SDK subprocess
-    // In Tauri bundled mode, process.execPath is the compiled sidecar binary which cannot
-    // run external JS files. Fall back to 'bun' (or 'node') so the SDK spawns cli.js
-    // with a proper JS runtime instead.
-    const isBundledSidecar = process.execPath.includes('.app/') || process.execPath.includes('youclaw-server')
-    const executable = isBundledSidecar ? 'bun' : process.execPath
+    // Uses resolveRuntimeExecutable() which returns embedded bun if available,
+    // falling back to system bun or process.execPath in dev mode.
+    const executable = resolveRuntimeExecutable()
 
     const queryOptions: Record<string, unknown> = {
       model,
@@ -546,7 +612,7 @@ export class AgentRuntime {
       settingSources: ['project'],
       ...(existingSessionId ? { resume: existingSessionId } : {}),
     }
-    logger.info({ cliPath, executable, isBundledSidecar, category: 'agent' }, 'SDK executable config')
+    logger.info({ cliPath, executable, category: 'agent' }, 'SDK executable config')
 
     // Sub-agent config (compile ref references via AgentCompiler)
     if (this.config.agents) {
