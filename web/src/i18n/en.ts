@@ -104,6 +104,15 @@ export const en = {
     browserProfile: 'Browser Profile',
     browserProfileNone: 'None',
     browserProfileHint: 'Bind a browser profile to persist login state',
+    skills: 'Skills',
+    skillsAll: 'All Skills',
+    skillsSpecific: 'Specific Skills',
+    skillsSearch: 'Filter skills...',
+    skillsSelectAll: 'Select All',
+    skillsDeselectAll: 'Deselect All',
+    skillsAllHint: 'Agent can use all available skills',
+    skillsSpecificHint: 'Agent can only use selected skills',
+    noSkillsAvailable: 'No skills available',
   },
   tasks: {
     title: 'Cron Jobs',
@@ -221,6 +230,7 @@ export const en = {
     recommended: 'Recommended',
     deleteSkill: 'Delete Skill',
     confirmDeleteSkill: 'Are you sure you want to delete this skill? This cannot be undone.',
+    deleteAffectsAgents: 'This skill is used by the following agents (will be updated automatically):',
     deleting: 'Deleting...',
   },
   memory: {

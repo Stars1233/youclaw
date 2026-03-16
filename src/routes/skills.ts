@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { ROOT_DIR } from '../config/index.ts'
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { getLogger } from '../logger/index.ts'
 import type { SkillsLoader } from '../skills/index.ts'
 import { SkillsInstaller } from '../skills/installer.ts'
@@ -234,12 +235,46 @@ export function createSkillsRoutes(skillsLoader: SkillsLoader, agentManager: Age
       const skillDir = dirname(skill.path)
       await installer.uninstall(basename(skillDir), dirname(skillDir))
       skillsLoader.refresh()
+
+      // Clean up agent configs that reference the deleted skill
+      const agents = agentManager.getAgents()
+      let modified = false
+      for (const agent of agents) {
+        if (!agent.skills?.includes(name)) continue
+        const yamlPath = resolve(agent.workspaceDir, 'agent.yaml')
+        if (!existsSync(yamlPath)) continue
+        try {
+          const raw = readFileSync(yamlPath, 'utf-8')
+          const doc = parseYaml(raw)
+          if (Array.isArray(doc.skills)) {
+            doc.skills = doc.skills.filter((s: string) => s !== name)
+            writeFileSync(yamlPath, stringifyYaml(doc), 'utf-8')
+            modified = true
+          }
+        } catch (yamlErr) {
+          logger.error({ agent: agent.id, error: yamlErr }, 'Failed to clean skill from agent.yaml')
+        }
+      }
+      if (modified) {
+        agentManager.reloadAgents()
+      }
+
       return c.json({ ok: true })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error({ name, error: msg }, 'Failed to uninstall skill')
       return c.json({ error: msg }, 500)
     }
+  })
+
+  // GET /api/skills/:name/agents — agents that reference a skill
+  skills.get('/skills/:name/agents', (c) => {
+    const name = c.req.param('name')
+    const agents = agentManager.getAgents()
+    const matched = agents
+      .filter((a) => a.skills?.includes(name))
+      .map((a) => ({ id: a.id, name: a.name }))
+    return c.json({ agents: matched })
   })
 
   // GET /api/skills/:name — single skill details

@@ -106,6 +106,15 @@ export const zh: Translations = {
     browserProfile: '浏览器 Profile',
     browserProfileNone: '不使用',
     browserProfileHint: '绑定浏览器 Profile 以复用登录状态',
+    skills: 'Skills',
+    skillsAll: '全部 Skills',
+    skillsSpecific: '指定 Skills',
+    skillsSearch: '搜索 Skill...',
+    skillsSelectAll: '全选',
+    skillsDeselectAll: '取消全选',
+    skillsAllHint: 'Agent 可使用所有可用 Skills',
+    skillsSpecificHint: 'Agent 只能使用选中的 Skills',
+    noSkillsAvailable: '没有可用的 Skills',
   },
   tasks: {
     title: '定时任务',
@@ -223,6 +232,7 @@ export const zh: Translations = {
     recommended: '推荐技能',
     deleteSkill: '删除 Skill',
     confirmDeleteSkill: '确定要删除这个 Skill 吗？此操作不可撤销。',
+    deleteAffectsAgents: '以下 Agent 引用了此 Skill（删除后将自动更新配置）：',
     deleting: '删除中...',
   },
   memory: {

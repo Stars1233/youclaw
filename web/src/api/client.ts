@@ -224,6 +224,13 @@ export async function deleteSkill(name: string) {
   })
 }
 
+// Get agents that reference a specific skill
+export async function getSkillAgents(skillName: string) {
+  return apiFetch<{ agents: Array<{ id: string; name: string }> }>(
+    `/api/skills/${encodeURIComponent(skillName)}/agents`
+  )
+}
+
 // Enable/disable skill
 export async function toggleSkill(name: string, enabled: boolean) {
   return apiFetch<Skill>(`/api/skills/${encodeURIComponent(name)}/toggle`, {

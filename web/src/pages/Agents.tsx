@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getAgents, getAgentDocs, updateAgentDoc, createAgent, deleteAgent, getAgentConfig, updateAgentConfig, getBrowserProfiles } from '../api/client'
-import type { BrowserProfileDTO } from '../api/client'
+import { getAgents, getAgentDocs, updateAgentDoc, createAgent, deleteAgent, getAgentConfig, updateAgentConfig, getBrowserProfiles, getSkills } from '../api/client'
+import type { BrowserProfileDTO, Skill } from '../api/client'
 import { useNavigate } from 'react-router-dom'
 import {
   Bot, FolderOpen, MessageSquare, Plus, Trash2,
   FileText, Save, Pencil, X, ChevronRight,
-  Activity, Clock, AlertCircle, Layers, Globe,
+  Activity, Clock, AlertCircle, Layers, Globe, Puzzle,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '../i18n'
 import { useChatContext } from '../hooks/chatCtx'
 import { SidePanel } from '@/components/layout/SidePanel'
@@ -88,6 +91,10 @@ export function Agents() {
   const [browserProfiles, setBrowserProfiles] = useState<BrowserProfileDTO[]>([])
   const [agentBrowserProfile, setAgentBrowserProfile] = useState<string | undefined>(undefined)
 
+  // Skills related state
+  const [allSkills, setAllSkills] = useState<Skill[]>([])
+  const [agentSkills, setAgentSkills] = useState<string[] | undefined>(undefined)
+
   const loadAgents = useCallback(() => {
     getAgents().then((list) => setAgents(list as Agent[])).catch(() => {})
   }, [])
@@ -95,6 +102,7 @@ export function Agents() {
   useEffect(() => {
     loadAgents()
     getBrowserProfiles().then(setBrowserProfiles).catch(() => {})
+    getSkills().then(setAllSkills).catch(() => {})
   }, [loadAgents])
 
   // Load documents for the selected agent
@@ -108,20 +116,25 @@ export function Agents() {
     }
   }, [selected])
 
-  // Load sub-agent config and browserProfile when agent is selected
-  useEffect(() => {
-    if (selected) {
-      getAgentConfig(selected)
-        .then((config) => {
-          setSubAgents((config.agents as SubAgentsMap) ?? {})
-          setAgentBrowserProfile(config.browserProfile as string | undefined)
-        })
-        .catch(() => {
-          setSubAgents({})
-          setAgentBrowserProfile(undefined)
-        })
-    }
+  // Load agent config (sub-agents, browserProfile, skills)
+  const loadConfig = useCallback(() => {
+    if (!selected) return
+    getAgentConfig(selected)
+      .then((config) => {
+        setSubAgents((config.agents as SubAgentsMap) ?? {})
+        setAgentBrowserProfile(config.browserProfile as string | undefined)
+        setAgentSkills(config.skills as string[] | undefined)
+      })
+      .catch(() => {
+        setSubAgents({})
+        setAgentBrowserProfile(undefined)
+        setAgentSkills(undefined)
+      })
   }, [selected])
+
+  useEffect(() => {
+    if (selected) loadConfig()
+  }, [selected, loadConfig])
 
   // Save sub-agent config
   const handleSaveSubAgents = async (updatedAgents: SubAgentsMap) => {
@@ -294,6 +307,9 @@ export function Agents() {
             agentBrowserProfile={agentBrowserProfile}
             onSaveBrowserProfile={handleSaveBrowserProfile}
             onRename={handleRename}
+            allSkills={allSkills}
+            agentSkills={agentSkills}
+            onSkillsUpdate={loadConfig}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -416,6 +432,9 @@ function AgentDetail({
   agentBrowserProfile,
   onSaveBrowserProfile,
   onRename,
+  allSkills,
+  agentSkills,
+  onSkillsUpdate,
 }: {
   t: ReturnType<typeof useI18n>['t']
   agent: Agent
@@ -437,6 +456,9 @@ function AgentDetail({
   agentBrowserProfile: string | undefined
   onSaveBrowserProfile: (profileId: string | undefined) => Promise<void>
   onRename: (newName: string) => Promise<void>
+  allSkills: Skill[]
+  agentSkills: string[] | undefined
+  onSkillsUpdate: () => void
 }) {
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(agent.name)
@@ -575,6 +597,14 @@ function AgentDetail({
           </div>
         </div>
       )}
+
+      {/* Skills section */}
+      <AgentSkillsSection
+        agentId={agent.id}
+        agentSkills={agentSkills}
+        allSkills={allSkills}
+        onUpdate={onSkillsUpdate}
+      />
 
       {/* Sub-agents section */}
       <SubAgentsSection t={t} subAgents={subAgents} onSave={onSaveSubAgents} />
@@ -728,6 +758,122 @@ function cleanDraft(draft: SubAgentDef): SubAgentDef {
   if (draft.skills && draft.skills.length > 0) result.skills = draft.skills
   if (draft.maxTurns && draft.maxTurns > 0) result.maxTurns = draft.maxTurns
   return result
+}
+
+// === Agent Skills Section ===
+function AgentSkillsSection({
+  agentId,
+  agentSkills,
+  allSkills,
+  onUpdate,
+}: {
+  agentId: string
+  agentSkills: string[] | undefined
+  allSkills: Skill[]
+  onUpdate: () => void
+}) {
+  const { t } = useI18n()
+  const [search, setSearch] = useState('')
+
+  const filteredSkills = allSkills.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.frontmatter.description.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const selectedSet = new Set(agentSkills ?? [])
+  const allSelected = filteredSkills.length > 0 && filteredSkills.every(s => selectedSet.has(s.name))
+  const someSelected = filteredSkills.some(s => selectedSet.has(s.name))
+
+  const handleToggleSkill = async (skillName: string, checked: boolean) => {
+    const current = agentSkills ?? []
+    const next = checked
+      ? [...current, skillName]
+      : current.filter(s => s !== skillName)
+    await updateAgentConfig(agentId, { skills: next })
+    onUpdate()
+  }
+
+  const handleToggleAll = async () => {
+    if (allSelected) {
+      // Deselect all visible
+      const visible = new Set(filteredSkills.map(s => s.name))
+      const next = (agentSkills ?? []).filter(s => !visible.has(s))
+      await updateAgentConfig(agentId, { skills: next })
+    } else {
+      // Select all visible
+      const current = new Set(agentSkills ?? [])
+      const next = [...current]
+      for (const s of filteredSkills) {
+        if (!current.has(s.name)) next.push(s.name)
+      }
+      await updateAgentConfig(agentId, { skills: next })
+    }
+    onUpdate()
+  }
+
+  const [expanded, setExpanded] = useState(false)
+  const selectedCount = selectedSet.size
+
+  return (
+    <div className="space-y-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full text-left"
+      >
+        <ChevronRight className={cn('h-3.5 w-3.5 transition-transform shrink-0', expanded && 'rotate-90')} />
+        <Puzzle className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-medium">{t.agents.skills}</h3>
+        <span className="text-xs text-muted-foreground ml-auto">{selectedCount}/{allSkills.length}</span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-2 pl-5">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder={t.agents.skillsSearch}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 text-xs flex-1"
+            />
+            <label className="flex items-center gap-2 cursor-pointer shrink-0">
+              <Checkbox
+                checked={allSelected}
+                {...(someSelected && !allSelected ? { 'data-state': 'indeterminate' } : {})}
+                onCheckedChange={handleToggleAll}
+              />
+              <span className="text-xs text-muted-foreground">
+                {allSelected ? t.agents.skillsDeselectAll : t.agents.skillsSelectAll}
+              </span>
+            </label>
+          </div>
+
+          {filteredSkills.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">{t.agents.noSkillsAvailable}</p>
+          ) : (
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {filteredSkills.map(skill => (
+                <label
+                  key={skill.name}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selectedSet.has(skill.name)}
+                    onCheckedChange={(checked) => handleToggleSkill(skill.name, !!checked)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm">{skill.name}</span>
+                    {skill.frontmatter.description && (
+                      <span className="text-xs text-muted-foreground ml-2">{skill.frontmatter.description}</span>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // === Sub-Agent Management Section ===
