@@ -52,6 +52,11 @@ export function createSystemRoutes(agentManager: AgentManager, eventBus: EventBu
         path: paths.db,
         sizeBytes: dbSizeBytes,
       },
+      skills: {
+        path: paths.skills,
+        exists: existsSync(paths.skills),
+        resourcesDir: process.env.RESOURCES_DIR ?? null,
+      },
       startedAt,
     })
   })

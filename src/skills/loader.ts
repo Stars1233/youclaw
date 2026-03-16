@@ -43,6 +43,7 @@ export class SkillsLoader {
 
     // 2. Project-level (builtin)
     const projectSkillsDir = paths.skills
+    logger.info({ projectSkillsDir, exists: existsSync(projectSkillsDir) }, 'Builtin skills path resolved')
     this.loadSkillsFromDir(projectSkillsDir, 'builtin', skillMap)
 
     // 1. Agent workspace-level (highest priority, loaded last to override)
@@ -211,7 +212,10 @@ export class SkillsLoader {
   private loadSkillsFromDir(dir: string, source: Skill['source'], skillMap: Map<string, Skill>): void {
     const logger = getLogger()
 
-    if (!existsSync(dir)) return
+    if (!existsSync(dir)) {
+      logger.debug({ dir, source }, 'Skills directory does not exist, skipping')
+      return
+    }
 
     let dirEntries: string[]
     try {

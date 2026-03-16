@@ -169,21 +169,23 @@ export class PromptBuilder {
   }
 
   /**
-   * Build skills prompt fragment
+   * Build skills prompt fragment.
+   * Injects all enabled skills — eligible ones get full content,
+   * ineligible ones get a warning with install instructions so AI knows they exist.
    */
   private buildSkillsPrompt(config: AgentConfig, requestedSkills?: string[]): string | null {
     if (!this.skillsLoader) return null
 
     const skills = this.skillsLoader.loadSkillsForAgent(config)
-    const eligibleSkills = skills.filter((s) => s.eligible)
+    const enabledSkills = skills.filter((s) => s.enabled)
 
-    if (eligibleSkills.length === 0) return null
+    if (enabledSkills.length === 0) return null
 
-    // If user explicitly requested skills, inject only matched ones; otherwise fall back to all eligible
-    let skillsToInject = eligibleSkills
+    // If user explicitly requested skills, filter to those
+    let skillsToInject = enabledSkills
     if (requestedSkills && requestedSkills.length > 0) {
       const requested = new Set(requestedSkills)
-      const matched = eligibleSkills.filter((s) => requested.has(s.name))
+      const matched = enabledSkills.filter((s) => requested.has(s.name))
       if (matched.length > 0) {
         skillsToInject = matched
       }
@@ -193,7 +195,18 @@ export class PromptBuilder {
 
     let prompt = '## Skills\n'
     for (const skill of limited) {
-      prompt += `\n### ${skill.name}\n${skill.content}\n`
+      if (skill.eligible) {
+        prompt += `\n### ${skill.name}\n${skill.content}\n`
+      } else {
+        // Inject with unavailability warning + install instructions
+        prompt += `\n### ${skill.name} [NOT AVAILABLE]\n`
+        prompt += `> This skill is currently unavailable: ${skill.eligibilityErrors.join('; ')}.\n`
+        if (skill.frontmatter.install) {
+          prompt += `> Install: ${Object.entries(skill.frontmatter.install).map(([, cmd]) => `\`${cmd}\``).join(' or ')}\n`
+        }
+        prompt += `> Do NOT attempt to use this skill's commands until the user installs the required dependencies.\n`
+        prompt += `\n${skill.frontmatter.description}\n`
+      }
     }
 
     return prompt
