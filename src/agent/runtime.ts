@@ -136,6 +136,41 @@ export class AgentRuntime {
           throw new Error('Not logged in: Please log in to use built-in models')
         }
         process.env.ANTHROPIC_CUSTOM_HEADERS = `rdxtoken: ${authToken}`
+
+        // Pre-flight check: verify connectivity to cloud server before spawning SDK subprocess
+        if (modelConfig.baseUrl) {
+          try {
+            const preflight = await fetch(`${modelConfig.baseUrl}/v1/messages`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'anthropic-version': '2023-06-01',
+                'x-api-key': modelConfig.apiKey,
+                'rdxtoken': authToken,
+              },
+              body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
+              signal: AbortSignal.timeout(15000),
+            })
+            logger.info({
+              agentId, chatId,
+              preflightStatus: preflight.status,
+              category: 'agent',
+            }, 'Cloud pre-flight check completed')
+            if (preflight.status === 401 || preflight.status === 403) {
+              const body = await preflight.text().catch(() => '')
+              throw new Error(`Cloud authentication failed (HTTP ${preflight.status}): ${body.slice(0, 200)}`)
+            }
+          } catch (err) {
+            if (err instanceof Error && err.message.startsWith('Cloud authentication failed')) {
+              throw err
+            }
+            // Network-level failure
+            if (err instanceof Error && (err.name === 'TimeoutError' || err.message.includes('timeout'))) {
+              throw new Error('Cannot reach cloud server (timeout after 15s). Please check your network connection.')
+            }
+            logger.warn({ agentId, chatId, error: String(err), category: 'agent' }, 'Cloud pre-flight check failed, proceeding with SDK anyway')
+          }
+        }
       } else {
         // Custom model: clean up rdxtoken header to prevent leaking from previous builtin requests
         delete process.env.ANTHROPIC_CUSTOM_HEADERS
