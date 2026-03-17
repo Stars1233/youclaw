@@ -1,28 +1,90 @@
-# YouClaw
+<p align="center">
+  <img src="web/src/assets/logo.png" width="120" alt="YouClaw Logo" />
+</p>
 
-Desktop AI assistant powered by Claude, inspired by nanoClaw / OpenClaw.
+<h1 align="center">YouClaw</h1>
 
-- Multi-agent management with YAML config
-- Scheduled tasks (cron / interval / once)
-- Persistent per-agent memory
-- Skills system compatible with OpenClaw SKILL.md format
-- Web UI (React + shadcn/ui) with SSE streaming
-- Telegram channel support
-- Tauri 2 desktop app (~27MB DMG vs ~338MB Electron)
+<p align="center">
+  <strong>Desktop AI Assistant powered by Claude Agent SDK</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/CodePhiliaX/youClaw/releases"><img src="https://img.shields.io/github/v/release/CodePhiliaX/youClaw?style=flat-square&color=blue" alt="Release" /></a>
+  <a href="https://github.com/CodePhiliaX/youClaw/blob/main/LICENSE"><img src="https://img.shields.io/github/license/CodePhiliaX/youClaw?style=flat-square" alt="License" /></a>
+  <a href="https://github.com/CodePhiliaX/youClaw/stargazers"><img src="https://img.shields.io/github/stars/CodePhiliaX/youClaw?style=flat-square" alt="Stars" /></a>
+  <a href="https://github.com/CodePhiliaX/youClaw"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square" alt="Platform" /></a>
+</p>
+
+<p align="center">
+  Inspired by <a href="https://github.com/qwibitai/nanoclaw">nanoClaw</a> / OpenClaw — lighter, faster, with a native desktop experience.
+</p>
+
+---
+
+## Download & Install
+
+### macOS
+
+Download the `.dmg` file from the [Releases](https://github.com/CodePhiliaX/youClaw/releases) page, open it and drag **YouClaw** into Applications.
+
+> Apple Silicon (M1/M2/M3/M4) and Intel are both supported.
+
+### Windows
+
+Download the `.exe` installer from [Releases](https://github.com/CodePhiliaX/youClaw/releases) and run it.
+
+### Linux
+
+🚧 Coming soon — stay tuned!
+
+---
+
+## Features
+
+- **Multi-Agent Management** — Create and configure multiple AI agents via YAML, each with its own personality, memory, and skills
+- **Scheduled Tasks** — Cron / interval / one-shot tasks with automatic retry and stuck detection
+- **Persistent Memory** — Per-agent memory system with conversation logs
+- **Skills System** — Compatible with OpenClaw SKILL.md format, 3-tier priority loading, hot reload
+- **Web UI** — React + shadcn/ui with SSE streaming, i18n (中文 / English)
+- **Telegram Channel** — Connect agents to Telegram bots
+- **Lightweight Desktop App** — Tauri 2 bundle ~27 MB (vs ~338 MB Electron), native system tray
 
 ## Tech Stack
 
 | Layer | Choice |
 |-------|--------|
-| Runtime & Package Manager | Bun |
-| Desktop Shell | Tauri 2 (Rust) |
+| Runtime & Package Manager | [Bun](https://bun.sh/) |
+| Desktop Shell | [Tauri 2](https://tauri.app/) (Rust) |
 | Backend | Hono + bun:sqlite + Pino |
 | Agent | `@anthropic-ai/claude-agent-sdk` |
 | Frontend | Vite + React + shadcn/ui + Tailwind CSS |
 | Telegram | grammY |
 | Scheduled Tasks | croner |
 
-## Quick Start
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              Tauri 2 (Rust Shell)                │
+│   ┌──────────────┐    ┌───────────────────────┐ │
+│   │   WebView     │    │   Bun Sidecar         │ │
+│   │  Vite+React   │◄──►  Hono API Server      │ │
+│   │  shadcn/ui    │ HTTP│  Claude Agent SDK    │ │
+│   │               │ SSE │  bun:sqlite          │ │
+│   └──────────────┘    └───────────────────────┘ │
+└─────────────────────────────────────────────────┘
+         │                        │
+    Tauri Store              EventBus
+   (settings)          ┌────────┴────────┐
+                        │                 │
+                   Web / API         Telegram
+```
+
+- **Desktop mode**: Tauri spawns a Bun sidecar process; WebView loads the frontend
+- **Web mode**: Vite frontend + Bun backend deployed independently
+- **Three-layer design**: Entry (Telegram/Web/API) → Core (Agent/Scheduler/Memory/Skills) → Storage (SQLite/filesystem)
+
+## Quick Start (Development)
 
 ### Prerequisites
 
@@ -33,7 +95,6 @@ Desktop AI assistant powered by Claude, inspired by nanoClaw / OpenClaw.
 ### Setup
 
 ```bash
-# Clone
 git clone https://github.com/CodePhiliaX/youClaw.git
 cd youClaw
 
@@ -46,45 +107,56 @@ cp .env.example .env
 # Edit .env and set ANTHROPIC_API_KEY
 ```
 
-### Run (Web mode)
+### Web Mode
 
 ```bash
-# Start backend (hot reload)
+# Terminal 1 — backend
 bun dev
 
-# Start frontend (in another terminal)
+# Terminal 2 — frontend
 bun dev:web
 ```
 
-Open http://localhost:5173 for the Web UI. The API server runs on http://localhost:3000.
+Open http://localhost:5173 · API at http://localhost:3000
 
-### Run (Desktop mode)
+### Desktop Mode (Tauri)
 
 ```bash
-# Tauri dev mode (frontend + backend + WebView + DevTools)
 bun dev:tauri
 ```
 
 ### Build Desktop App
 
 ```bash
-# Build sidecar + Tauri bundle
 bun build:tauri
 ```
 
 Output: `src-tauri/target/release/bundle/` (DMG / MSI / AppImage)
 
+## Commands
+
+```bash
+bun dev              # Backend dev server (hot reload)
+bun dev:web          # Frontend dev server
+bun dev:tauri        # Tauri dev mode (frontend + backend + WebView)
+bun start            # Production backend
+bun typecheck        # TypeScript type check
+bun test             # Run tests
+bun build:sidecar    # Compile Bun sidecar binary
+bun build:tauri      # Build Tauri desktop app
+```
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | - | Anthropic API key |
-| `ANTHROPIC_BASE_URL` | No | - | Custom API base URL |
+| `ANTHROPIC_API_KEY` | Yes | — | Anthropic API key |
+| `ANTHROPIC_BASE_URL` | No | — | Custom API base URL |
 | `PORT` | No | `3000` | Backend server port |
 | `DATA_DIR` | No | `./data` | Data storage directory |
 | `AGENT_MODEL` | No | `claude-sonnet-4-6` | Default Claude model |
-| `LOG_LEVEL` | No | `info` | Log level (debug/info/warn/error) |
-| `TELEGRAM_BOT_TOKEN` | No | - | Enable Telegram channel |
+| `LOG_LEVEL` | No | `info` | Log level |
+| `TELEGRAM_BOT_TOKEN` | No | — | Enable Telegram channel |
 
 ## Project Structure
 
@@ -103,28 +175,17 @@ src/
 ├── skills/         # Skills loader, watcher, frontmatter parser
 src-tauri/
 ├── src/            # Rust main process (sidecar, window, tray, updater)
-├── capabilities/   # Tauri permission config
-├── bin/            # Bun sidecar compiled binaries
-├── icons/          # App & tray icons
 agents/             # Agent configs (agent.yaml + SOUL.md + skills/)
 skills/             # Project-level skills (SKILL.md format)
-prompts/            # System & environment prompts
-web/src/            # React frontend
+web/src/            # React frontend (pages, components, i18n)
 ```
 
-## Commands
+## Contributing
 
-```bash
-bun dev              # Backend dev server (hot reload)
-bun dev:web          # Frontend dev server
-bun dev:tauri        # Tauri dev mode (frontend + backend + WebView)
-bun start            # Production backend
-bun typecheck        # TypeScript type check
-bun test             # Run tests
-bun build:sidecar    # Compile Bun sidecar binary
-bun build:tauri      # Build Tauri desktop app
-```
+1. Fork the repo and create your branch from `main`
+2. Make your changes and ensure `bun typecheck` and `bun test` pass
+3. Submit a pull request
 
 ## License
 
-ISC
+[MIT](LICENSE) © CHATDATA
