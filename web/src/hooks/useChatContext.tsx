@@ -1,11 +1,9 @@
+import { useState, useCallback, useEffect, type ReactNode } from "react";
 import {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  type ReactNode,
-} from "react";
-import { useChat } from "./useChat";
+  useActiveChatState,
+  useChatActions,
+  onChatUpdate,
+} from "./useChat";
 import {
   getChats,
   getAgents,
@@ -16,6 +14,8 @@ import {
 } from "../api/client";
 import { getItem, setItem } from "@/lib/storage";
 import { ChatContext } from "./chatCtx";
+import { useChatStore } from "@/stores/chat";
+import { sseManager } from "@/lib/sse-manager";
 import type { ChatItem } from "@/lib/chat-utils";
 
 const LAST_AGENT_KEY = "last-agent-id";
@@ -35,7 +35,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
   const [ready, setReady] = useState(false);
 
-  const chat = useChat(agentId);
+  const activeChatState = useActiveChatState();
+  const actions = useChatActions(agentId);
 
   // Async load last agentId on startup
   useEffect(() => {
@@ -79,24 +80,38 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
+  // Refresh on active chat change
+  const activeChatId = useChatStore((s) => s.activeChatId);
   useEffect(() => {
     refreshChats();
-  }, [chat.chatId, chat.messages.length, refreshChats]);
+  }, [activeChatId, refreshChats]);
+
+  // Debounced refresh on chat updates (completeMessage, addUserMessage)
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = onChatUpdate(() => {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        refreshChats();
+        timeout = null;
+      }, 500);
+    });
+    return () => {
+      unsubscribe();
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [refreshChats]);
 
   // Persist agentId
   useEffect(() => {
     if (ready) setItem(LAST_AGENT_KEY, agentId);
   }, [agentId, ready]);
 
-  const chatRef = useRef(chat);
-  useEffect(() => {
-    chatRef.current = chat;
-  });
-
   const deleteChat = useCallback(
     async (chatIdToDelete: string) => {
       await deleteChatApi(chatIdToDelete);
-      if (chatRef.current.chatId === chatIdToDelete) chatRef.current.newChat();
+      sseManager.disconnect(chatIdToDelete);
+      useChatStore.getState().removeChat(chatIdToDelete);
       refreshChats();
     },
     [refreshChats],
@@ -116,7 +131,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   return (
     <ChatContext.Provider
       value={{
-        ...chat,
+        chatId: activeChatState?.chatId ?? null,
+        messages: activeChatState?.messages ?? [],
+        streamingText: activeChatState?.streamingText ?? "",
+        isProcessing: activeChatState?.isProcessing ?? false,
+        pendingToolUse: activeChatState?.pendingToolUse ?? [],
+        chatStatus: activeChatState?.chatStatus ?? "ready",
+        showInsufficientCredits:
+          activeChatState?.showInsufficientCredits ?? false,
+        ...actions,
         chatList,
         refreshChats,
         searchQuery,
