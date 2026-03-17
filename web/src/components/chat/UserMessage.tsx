@@ -19,24 +19,39 @@ function UserAvatar() {
   const sizeClass = "w-8 h-8 text-xs";
 
   if (isLoggedIn && user?.avatar) {
-    return <img src={user.avatar} alt={user.name} className={cn("rounded-full object-cover", sizeClass)} />;
+    return (
+      <img
+        src={user.avatar}
+        alt={user.name}
+        className={cn("rounded-full object-cover", sizeClass)}
+      />
+    );
   }
   if (isLoggedIn && user) {
     return (
-      <div className={cn("rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold", sizeClass)}>
-        {user.name?.[0]?.toUpperCase() ?? '?'}
+      <div
+        className={cn(
+          "rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold",
+          sizeClass,
+        )}
+      >
+        {user.name?.[0]?.toUpperCase() ?? "?"}
       </div>
     );
   }
   return (
-    <div className={cn("rounded-full bg-muted flex items-center justify-center text-muted-foreground", sizeClass)}>
+    <div
+      className={cn(
+        "rounded-full bg-muted flex items-center justify-center text-muted-foreground",
+        sizeClass,
+      )}
+    >
       <User className="h-4 w-4" />
     </div>
   );
 }
 
 export function UserMessage({ message }: { message: Message }) {
-  const { t } = useI18n();
   const attachments = message.attachments ?? [];
 
   return (
@@ -47,7 +62,7 @@ export function UserMessage({ message }: { message: Message }) {
         </div>
         <div className="flex-1 min-w-0 flex flex-col items-end">
           <div className="text-xs font-medium text-muted-foreground mb-1.5">
-            {t.chat.you}
+            {/* {t.chat.you} */}
             <span className="ml-2 text-[10px] opacity-60">
               {new Date(message.timestamp).toLocaleTimeString([], {
                 hour: "2-digit",
