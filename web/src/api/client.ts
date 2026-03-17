@@ -32,6 +32,13 @@ export async function getMessages(chatId: string) {
   return apiFetch<Array<{ id: string; chat_id: string; sender: string; sender_name: string; content: string; timestamp: string; is_from_me: number; is_bot_message: number; attachments: Attachment[] | null }>>(`/api/chats/${encodeURIComponent(chatId)}/messages`)
 }
 
+// Abort a running chat query
+export async function abortChat(chatId: string) {
+  return apiFetch<{ ok: boolean; aborted: boolean }>(`/api/chats/${encodeURIComponent(chatId)}/abort`, {
+    method: 'POST',
+  })
+}
+
 // Delete chat
 export async function deleteChat(chatId: string) {
   return apiFetch<{ ok: boolean }>(`/api/chats/${encodeURIComponent(chatId)}`, {
