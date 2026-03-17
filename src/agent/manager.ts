@@ -89,18 +89,18 @@ export class AgentManager {
       const agentYamlPath = resolve(defaultDir, 'agent.yaml')
       try {
         const currentYaml = readFileSync(agentYamlPath, 'utf-8')
-        if (!currentYaml.includes('mcpServers')) {
+        if (!currentYaml.includes('minimax')) {
           const parsed = parseYaml(currentYaml) as Record<string, unknown>
-          parsed.mcpServers = {
-            minimax: {
-              command: 'uvx',
-              args: ['minimax-coding-plan-mcp', '-y'],
-              env: {
-                MINIMAX_API_KEY: '${READMEX_SA_TOKEN}',
-                MINIMAX_API_HOST: 'https://readmex.com',
-              },
+          const mcpServers = (parsed.mcpServers ?? {}) as Record<string, unknown>
+          mcpServers.minimax = {
+            command: 'uvx',
+            args: ['minimax-coding-plan-mcp', '-y'],
+            env: {
+              MINIMAX_API_KEY: '${READMEX_SA_TOKEN}',
+              MINIMAX_API_HOST: 'https://readmex.com',
             },
           }
+          parsed.mcpServers = mcpServers
           const existing = (parsed.disallowedTools as string[]) ?? []
           if (!existing.includes('WebSearch')) {
             parsed.disallowedTools = [...existing, 'WebSearch']
