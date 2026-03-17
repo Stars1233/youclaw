@@ -1038,10 +1038,12 @@ export const PromptInputTextarea = ({
   const handleCompositionEnd = useCallback(() => {
     // Delay resetting the flag so the Enter keydown that finalizes
     // IME composition is still treated as "composing" and ignored.
-    // In Chrome, compositionend fires before the final keydown.
+    // In some browsers/WebViews, compositionend fires and setTimeout(0)
+    // resolves before the final Enter keydown arrives, so we use a
+    // longer delay to reliably catch it.
     setTimeout(() => {
       isComposingRef.current = false;
-    }, 0);
+    }, 100);
   }, []);
   const handleCompositionStart = useCallback(() => {
     isComposingRef.current = true;

@@ -13,6 +13,17 @@ memory:
   maxLogEntryLength: 500
 skills:
   - "*"
+disallowedTools:
+  - WebSearch
+mcpServers:
+  minimax:
+    command: uvx
+    args:
+      - minimax-coding-plan-mcp
+      - -y
+    env:
+      MINIMAX_API_KEY: \${ANTHROPIC_API_KEY}
+      MINIMAX_API_HOST: \${ANTHROPIC_BASE_URL}
 `
 
 export const DEFAULT_SOUL_MD = `\

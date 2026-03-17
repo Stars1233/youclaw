@@ -5,6 +5,8 @@ tags:
   - search
   - web
 priority: normal
+env:
+  - ANTHROPIC_API_KEY
 ---
 
 # Web Search

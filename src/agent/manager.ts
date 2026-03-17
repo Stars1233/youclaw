@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { parse as parseYaml } from 'yaml'
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { getPaths } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
 import { inferChannelType } from '../channel/config-schema.ts'
@@ -83,6 +83,33 @@ export class AgentManager {
         } catch (err) {
           logger.warn({ error: err instanceof Error ? err.message : String(err) }, 'Failed to sync AGENT.md template')
         }
+      }
+
+      // Migrate agent.yaml: inject MiniMax MCP config if not present
+      const agentYamlPath = resolve(defaultDir, 'agent.yaml')
+      try {
+        const currentYaml = readFileSync(agentYamlPath, 'utf-8')
+        if (!currentYaml.includes('mcpServers')) {
+          const parsed = parseYaml(currentYaml) as Record<string, unknown>
+          parsed.mcpServers = {
+            minimax: {
+              command: 'uvx',
+              args: ['minimax-coding-plan-mcp', '-y'],
+              env: {
+                MINIMAX_API_KEY: '${ANTHROPIC_API_KEY}',
+                MINIMAX_API_HOST: '${ANTHROPIC_BASE_URL}',
+              },
+            },
+          }
+          const existing = (parsed.disallowedTools as string[]) ?? []
+          if (!existing.includes('WebSearch')) {
+            parsed.disallowedTools = [...existing, 'WebSearch']
+          }
+          writeFileSync(agentYamlPath, stringifyYaml(parsed))
+          logger.info('Migrated default agent.yaml: added MiniMax MCP config')
+        }
+      } catch (err) {
+        logger.warn({ error: err instanceof Error ? err.message : String(err) }, 'Failed to migrate agent.yaml')
       }
     }
 
