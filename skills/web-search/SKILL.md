@@ -5,8 +5,11 @@ tags:
   - search
   - web
 priority: normal
-env:
-  - ANTHROPIC_API_KEY
+dependencies:
+  - uvx
+install:
+  curl: "curl -LsSf https://astral.sh/uv/install.sh | sh"
+  brew: "brew install uv"
 ---
 
 # Web Search
