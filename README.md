@@ -15,9 +15,6 @@
   <a href="https://github.com/CodePhiliaX/youClaw"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square" alt="Platform" /></a>
 </p>
 
-<p align="center">
-  Inspired by <a href="https://github.com/qwibitai/nanoclaw">nanoClaw</a> / OpenClaw — lighter, faster, with a native desktop experience.
-</p>
 
 ---
 
