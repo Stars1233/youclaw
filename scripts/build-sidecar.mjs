@@ -9,7 +9,7 @@
  */
 
 import { execSync } from 'node:child_process'
-import { mkdirSync, readdirSync, unlinkSync, writeFileSync, copyFileSync, chmodSync } from 'node:fs'
+import { mkdirSync, readdirSync, unlinkSync, writeFileSync, copyFileSync, chmodSync, existsSync, statSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -114,44 +114,44 @@ function copyBunRuntime() {
 
 copyBunRuntime()
 
-// Download MinGit zip for Windows (bundled as-is so NSIS doesn't drop nested dirs)
-// On non-Windows, creates a placeholder so Tauri resource config doesn't error
-async function downloadMinGit() {
-  const resourcesDir = resolve(root, 'src-tauri', 'resources')
-  mkdirSync(resourcesDir, { recursive: true })
-  const zipDest = resolve(resourcesDir, 'mingit.zip')
+// Prepare bundled Git installer for Windows (used by startup "Install Git" button)
+function prepareWindowsGitInstaller() {
+  const installerDir = resolve(root, 'src-tauri', 'resources', 'git-installer')
+  mkdirSync(installerDir, { recursive: true })
+
+  const installerName = process.env.YOUCLAW_GIT_INSTALLER_NAME || 'Git-2.53.0.2-64-bit.exe'
+  const installerPath = resolve(installerDir, installerName)
 
   if (process.platform !== 'win32') {
-    // Create an empty placeholder zip so Tauri resource glob doesn't error
-    const { existsSync } = await import('node:fs')
-    if (!existsSync(zipDest)) {
-      // Minimal valid zip (empty archive)
-      const emptyZip = Buffer.from([0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-      const { writeFileSync: wfs } = await import('node:fs')
-      wfs(zipDest, emptyZip)
-    }
-    console.log('Skipping MinGit download (not Windows)')
+    console.log('Skipping bundled Git installer download (not Windows)')
     return
   }
 
-  const { existsSync } = await import('node:fs')
-  if (existsSync(zipDest) && statSync(zipDest).size > 1000) {
-    console.log('MinGit zip already present, skipping download')
+  // Reuse existing installer if present and looks valid (>10MB)
+  if (existsSync(installerPath) && statSync(installerPath).size > 10 * 1024 * 1024) {
+    console.log(`Git installer already present: ${installerPath}`)
     return
   }
 
-  const version = '2.49.0'
-  // Regular MinGit includes MSYS2 runtime with usr/bin/bash.exe
-  // (busybox variant does NOT have bash.exe)
-  const zipName = `MinGit-${version}-64-bit.zip`
-  const url = `https://github.com/git-for-windows/git/releases/download/v${version}.windows.1/${zipName}`
+  const installerUrl = process.env.YOUCLAW_GIT_INSTALLER_URL || `https://cdn.chat2db-ai.com/youclaw/website/${installerName}`
+  console.log(`Downloading Git installer from ${installerUrl}`)
 
-  console.log(`Downloading MinGit ${version}...`)
-  execSync(`curl -fsSL -o "${zipDest}" "${url}"`, { stdio: 'inherit' })
-  console.log('MinGit zip downloaded successfully')
+  try {
+    // Prefer PowerShell on Windows to avoid curl dependency variations
+    const escapedUrl = installerUrl.replaceAll("'", "''")
+    const escapedPath = installerPath.replaceAll("'", "''")
+    execSync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri '${escapedUrl}' -OutFile '${escapedPath}'"`,
+      { stdio: 'inherit' }
+    )
+    console.log(`Bundled Git installer ready: ${installerPath}`)
+  } catch (err) {
+    console.error('Failed to download bundled Git installer:', err.message)
+    process.exit(1)
+  }
 }
 
-await downloadMinGit()
+prepareWindowsGitInstaller()
 
 // 清理 bun build --compile 产生的临时文件
 for (const f of readdirSync(root)) {

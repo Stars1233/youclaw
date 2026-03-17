@@ -283,6 +283,79 @@ function resolveRuntimeExecutable(): string {
   return 'bun'
 }
 
+function appendPathEntries(entries: string[]): void {
+  if (process.platform !== 'win32' || entries.length === 0) return
+  const currentPath = process.env.PATH || ''
+  const parts = currentPath.split(';').filter(Boolean)
+  for (const entry of entries) {
+    if (!entry || !existsSync(entry)) continue
+    if (!parts.includes(entry)) {
+      parts.push(entry)
+    }
+  }
+  process.env.PATH = parts.join(';')
+}
+
+function setWindowsGitBashPath(bashPath: string, source: string): void {
+  process.env.CLAUDE_CODE_GIT_BASH_PATH = bashPath
+
+  const bashDir = dirname(bashPath)
+  const gitRoot = bashDir.endsWith('\\usr\\bin')
+    ? dirname(dirname(bashDir))
+    : dirname(bashDir)
+
+  appendPathEntries([
+    resolve(gitRoot, 'bin'),
+    resolve(gitRoot, 'cmd'),
+    resolve(gitRoot, 'usr', 'bin'),
+    resolve(gitRoot, 'mingw64', 'bin'),
+  ])
+
+  safeLog('info', 'Git Bash ready for claude-agent-sdk on Windows', { source, bashPath })
+}
+
+function ensureWindowsGitBash(): string | null {
+  if (process.platform !== 'win32') return null
+
+  const existing = process.env.CLAUDE_CODE_GIT_BASH_PATH
+  if (existing && existsSync(existing)) {
+    setWindowsGitBashPath(existing, 'environment')
+    return existing
+  }
+
+  // Auto-detect system Git installation only (no bundled MinGit fallback)
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files'
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)'
+  const localAppData = process.env.LOCALAPPDATA || ''
+  const userProfile = process.env.USERPROFILE || ''
+
+  const systemCandidates = [
+    `${programFiles}\\Git\\bin\\bash.exe`,
+    `${programFilesX86}\\Git\\bin\\bash.exe`,
+    `${localAppData}\\Programs\\Git\\bin\\bash.exe`,
+    `${userProfile}\\scoop\\apps\\git\\current\\bin\\bash.exe`,
+  ]
+
+  try {
+    const whereBashOutput = execSync('where bash', { timeout: 5000, encoding: 'utf-8' })
+    for (const line of whereBashOutput.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)) {
+      systemCandidates.push(line)
+    }
+  } catch {
+    // ignore when bash is not on PATH
+  }
+
+  for (const candidate of systemCandidates) {
+    if (existsSync(candidate)) {
+      setWindowsGitBashPath(candidate, 'system-git')
+      return candidate
+    }
+  }
+
+  safeLog('warn', 'Git Bash not found on Windows; claude-agent-sdk may fail to start')
+  return null
+}
+
 // Deferred startup checks — run once on first executeQuery() call
 let _startupChecksDone = false
 function ensureStartupChecks(cliPath: string): void {
@@ -641,62 +714,8 @@ export class AgentRuntime {
       process.env.HOME = process.env.USERPROFILE
     }
 
-    // Auto-detect Git Bash on Windows (claude-agent-sdk requires it for shell commands)
-    if (process.platform === 'win32' && !process.env.CLAUDE_CODE_GIT_BASH_PATH) {
-      // Priority 1: Bundled MinGit — extracted from mingit.zip to DATA_DIR/mingit by Rust main process
-      const dataDir = process.env.DATA_DIR
-      const resourcesDir = process.env.RESOURCES_DIR
-      if (dataDir) {
-        const mingitDir = resolve(dataDir, 'mingit')
-        const bashPath = resolve(mingitDir, 'usr', 'bin', 'bash.exe')
-
-        // If not yet extracted, try extracting from bundled zip
-        if (!existsSync(bashPath) && resourcesDir) {
-          const zipPath = resolve(resourcesDir, 'mingit.zip')
-          if (existsSync(zipPath)) {
-            logger.info({ zipPath, mingitDir, category: 'agent' }, 'Extracting bundled mingit.zip')
-            try {
-              mkdirSync(mingitDir, { recursive: true })
-              execSync(
-                `powershell -NoProfile -Command "Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${mingitDir}'"`,
-                { timeout: 60_000 },
-              )
-              logger.info({ category: 'agent' }, 'MinGit extracted successfully')
-            } catch (e) {
-              logger.error({ err: e, category: 'agent' }, 'Failed to extract MinGit zip')
-            }
-          }
-        }
-
-        if (existsSync(bashPath)) {
-          logger.info({ path: bashPath, category: 'agent' }, 'Bundled MinGit detected on Windows')
-          process.env.CLAUDE_CODE_GIT_BASH_PATH = bashPath
-        }
-      } else {
-        logger.warn({ category: 'agent' }, 'DATA_DIR not set, cannot check bundled MinGit')
-      }
-
-      // Priority 2: System Git installation
-      if (!process.env.CLAUDE_CODE_GIT_BASH_PATH) {
-        const programFiles = process.env.ProgramFiles || 'C:\\Program Files'
-        const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)'
-        const localAppData = process.env.LOCALAPPDATA || ''
-
-        const candidates = [
-          `${programFiles}\\Git\\bin\\bash.exe`,
-          `${programFilesX86}\\Git\\bin\\bash.exe`,
-          `${localAppData}\\Programs\\Git\\bin\\bash.exe`,
-        ]
-
-        for (const candidate of candidates) {
-          if (existsSync(candidate)) {
-            logger.info({ path: candidate, category: 'agent' }, 'Git Bash auto-detected on Windows')
-            process.env.CLAUDE_CODE_GIT_BASH_PATH = candidate
-            break
-          }
-        }
-      }
-    }
+    // Ensure Git Bash is available on Windows (required by claude-agent-sdk shell runtime)
+    ensureWindowsGitBash()
 
     const cliPath = resolveCliPath()
     ensureStartupChecks(cliPath)
@@ -1121,6 +1140,12 @@ export class AgentRuntime {
     // Server error (5xx from proxy/API)
     if (/\b50[0-9]\b|server error|bad gateway|service unavailable/i.test(raw)) {
       return { message: 'The model API returned a server error. This is usually temporary — please retry.', errorCode: ErrorCode.MODEL_CONNECTION_FAILED }
+    }
+    if (/requires git-bash|git.?bash|CLAUDE_CODE_GIT_BASH_PATH|bash\.exe/i.test(raw)) {
+      return {
+        message: 'Windows is missing Git Bash required by Claude SDK. Please install Git from the startup dialog (Install button) or https://git-scm.com/download/win, then restart YouClaw.',
+        errorCode: ErrorCode.MODEL_CONNECTION_FAILED,
+      }
     }
     // Windows SDK subprocess crash — hint about Node.js
     if (process.platform === 'win32' && /process exited with code/i.test(raw) && !/upstream_response/i.test(raw)) {
