@@ -581,6 +581,13 @@ pub fn run() {
         .on_window_event(|window, event| {
             // Hide to tray on close instead of quitting
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // macOS: exit fullscreen before hiding to avoid black screen on re-show
+                #[cfg(target_os = "macos")]
+                {
+                    if window.is_fullscreen().unwrap_or(false) {
+                        let _ = window.set_fullscreen(false);
+                    }
+                }
                 let _ = window.hide();
                 api.prevent_close();
             }
