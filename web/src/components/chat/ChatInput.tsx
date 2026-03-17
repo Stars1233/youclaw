@@ -25,7 +25,7 @@ import { useI18n } from "@/i18n";
 import { useAppStore } from "@/stores/app";
 import { Bot, Globe, PlusIcon } from "lucide-react";
 
-const MAX_FILES = 5;
+const MAX_FILES = 10;
 
 // Attachment button that directly opens the file browser
 function AddAttachmentButton() {
