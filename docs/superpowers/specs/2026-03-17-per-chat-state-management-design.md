@@ -111,12 +111,13 @@ Event routing: SSEManager receives SSE events and dispatches directly to the Zus
 - `tool_use` -> `store.addToolUse(chatId, ...)`
 - `complete` -> `store.completeMessage(chatId, ...)` + `this.disconnect(chatId)`
 - `processing` -> `store.setProcessing(chatId, ...)` + disconnect if false
-- `error` -> `store.handleError(chatId, ...)` + `this.disconnect(chatId)`
+- `error` -> `store.markSseErrorHandled(chatId)` + `store.handleError(chatId, ...)` + `this.disconnect(chatId)`
 
 Connection lifecycle:
 - Created by `send()` action before calling `sendMessage` API
 - Auto-closed on `complete`, `error`, or `processing(false)` events
 - Fallback timer per connection: polls backend every 5s if no SSE event for 8s (moved from useChat)
+- `beforeunload` listener registered in SSEManager module init (not React) to call `disconnectAll()`
 
 ### React Hook Layer (`web/src/hooks/useChat.ts`)
 
@@ -163,6 +164,7 @@ function useChatActions(agentId: string): {
 1. Get activeChatId
 2. `sseManager.disconnect(chatId)`
 3. `store.setProcessing(chatId, false)` (resets streamingText and pendingToolUse)
+4. Call `abortChat(chatId)` API to stop backend agent processing (fire-and-forget, catch errors silently)
 
 ### ChatProvider (`web/src/hooks/useChatContext.tsx`)
 
@@ -251,7 +253,7 @@ Performance: each ChatListItem subscribes only to its own chatId's `isProcessing
 | `showInsufficientCredits` dialog | Per-chat `showInsufficientCredits` flag in `ChatState`. Set by `handleError` when `errorCode === 'INSUFFICIENT_CREDITS'`. ChatProvider reads from active chat state and passes through context. |
 | SSE connection lost mid-stream | Browser EventSource auto-reconnects. Fallback timer catches stale connections after 8s. |
 | SSE error + API error race | Per-chat `sseErrorHandled` flag prevents duplicate error messages. SSE error handler sets flag; `send()` catch checks flag before adding error message. |
-| Switch to chat that is streaming in background | `loadChat` finds chat already in store → instant display of current streaming progress. SSE connection continues dispatching to store. |
+| Switch to chat that is streaming in background | `loadChat` finds chat already in store -> instant display of current streaming progress. SSE connection continues dispatching to store. |
 
 ## Cleanup Strategy
 

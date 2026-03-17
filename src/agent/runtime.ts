@@ -397,9 +397,12 @@ export class AgentRuntime {
           throw new Error('Not logged in: Please log in to use built-in models')
         }
         process.env.ANTHROPIC_CUSTOM_HEADERS = `rdxtoken: ${authToken}`
+        // Inject auth token for MCP servers that proxy through ReadmeX (e.g. minimax)
+        process.env.READMEX_SA_TOKEN = authToken
       } else {
         // Custom model: clean up rdxtoken header to prevent leaking from previous builtin requests
         delete process.env.ANTHROPIC_CUSTOM_HEADERS
+        delete process.env.READMEX_SA_TOKEN
       }
 
       // Pre-flight check: verify API connectivity before spawning SDK subprocess
