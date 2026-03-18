@@ -693,7 +693,7 @@ export class AgentRuntime {
     model: string,
     requestedSkills?: string[],
     browserProfileId?: string,
-    attachments?: Array<{ filename: string; mediaType: string; data: string; size: number }>,
+    attachments?: Array<{ filename: string; mediaType: string; filePath: string }>,
   ): Promise<{ fullText: string; sessionId: string }> {
     const logger = getLogger()
     const abortController = new AbortController()
@@ -823,45 +823,20 @@ export class AgentRuntime {
       category: 'agent',
     }, 'Full SDK query options and env snapshot')
 
-    let q
+    // Append file path hints so the agent can read attached files via its tools
+    let finalUserPrompt = prompt
     if (attachments && attachments.length > 0) {
-      // Build multimodal content blocks
-      const content: Array<Record<string, unknown>> = [
-        { type: 'text', text: prompt },
-      ]
-      for (const a of attachments) {
-        if (a.mediaType.startsWith('image/')) {
-          content.push({
-            type: 'image',
-            source: { type: 'base64', media_type: a.mediaType, data: a.data },
-          })
-        } else {
-          content.push({
-            type: 'document',
-            source: { type: 'base64', media_type: a.mediaType, data: a.data },
-          })
-        }
-      }
-
-      const userMessage = {
-        type: 'user' as const,
-        message: { role: 'user' as const, content },
-        parent_tool_use_id: null,
-        session_id: existingSessionId || '',
-      }
-
-      async function* singleMessage<T>(msg: T) { yield msg }
-
-      q = query({
-        prompt: singleMessage(userMessage) as Parameters<typeof query>[0]['prompt'],
-        options: queryOptions as Parameters<typeof query>[0]['options'],
-      })
-    } else {
-      q = query({
-        prompt,
-        options: queryOptions as Parameters<typeof query>[0]['options'],
-      })
+      const fileList = attachments
+        .map((a) => `- ${a.filePath} (${a.mediaType}, ${a.filename})`)
+        .join('\n')
+      const suffix = `\n\nThe user attached the following files:\n${fileList}\nPlease read these files first before answering.`
+      finalUserPrompt = (prompt || '') + suffix
     }
+
+    const q = query({
+      prompt: finalUserPrompt,
+      options: queryOptions as Parameters<typeof query>[0]['options'],
+    })
 
     abortRegistry.setQuery(chatId, q as AsyncIterable<unknown> & { close?: () => void })
 

@@ -2,6 +2,21 @@
 
 export const isTauri = typeof window !== "undefined" && !!(window as any).__TAURI_INTERNALS__
 
+/**
+ * Convert a local file path to a URL loadable by the webview.
+ * Uses Tauri's asset protocol when available, falls back to file:// URL.
+ */
+export function localAssetUrl(filePath: string): string {
+  if (isTauri) {
+    // Tauri 2 asset protocol: identical to convertFileSrc() from @tauri-apps/api/core
+    const encoded = encodeURIComponent(filePath)
+    return navigator.userAgent.includes('Windows')
+      ? `http://asset.localhost/${encoded}`
+      : `asset://localhost/${encoded}`
+  }
+  return `file://${filePath}`
+}
+
 export function getTauriInvoke(): (cmd: string, args?: Record<string, unknown>) => Promise<unknown> {
   if (!isTauri) throw new Error("Not in Tauri environment")
   return (window as any).__TAURI_INTERNALS__.invoke

@@ -89,17 +89,14 @@ export function ChatInput() {
       return;
     }
 
-    // Convert data URLs to Attachment objects
+    // Build Attachment objects from file paths
     const attachments = msg.files
-      .map((f) => {
-        const match = f.url.match(/^data:([^;]+);base64,(.+)$/s);
-        if (!match) return null;
-        const [, mediaType, data] = match;
-        const padding = (data.match(/=+$/) || [""])[0].length;
-        const size = Math.floor((data.length * 3) / 4) - padding;
-        return { filename: f.filename, mediaType, data, size };
-      })
-      .filter((a): a is NonNullable<typeof a> => a !== null);
+      .filter((f) => f.filePath)
+      .map((f) => ({
+        filename: f.filename,
+        mediaType: f.mediaType,
+        filePath: f.filePath!,
+      }));
 
     send(
       text,
