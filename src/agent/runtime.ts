@@ -1,7 +1,7 @@
 import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
-import { existsSync, copyFileSync, mkdirSync, statSync, chmodSync } from 'node:fs'
+import { existsSync, copyFileSync, mkdirSync, statSync, chmodSync, writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { getEnv } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
@@ -61,6 +61,13 @@ function resolveCliPath(): string {
             mkdirSync(cacheDir, { recursive: true })
             copyFileSync(resourceCliPath, cachedCliPath)
             safeLog('info', `Copied cli.js to sdk-cache (quarantine bypass)`, { src: resourceCliPath, dst: cachedCliPath })
+          }
+
+          // Ensure Node.js recognises cli.js as ESM (required on Windows where Node is the runtime).
+          // Written outside needsCopy so existing caches without package.json are also fixed.
+          const pkgJsonPath = resolve(cacheDir, 'package.json')
+          if (!existsSync(pkgJsonPath)) {
+            writeFileSync(pkgJsonPath, '{"type":"module"}', 'utf-8')
           }
 
           // Strip macOS quarantine attribute from the cached copy
@@ -241,8 +248,28 @@ export function getBunRuntimeDir(): string | null {
 }
 
 /**
+ * Check that a Node.js executable meets the minimum version required by claude-agent-sdk (>=18).
+ * Returns true if the version is sufficient, false otherwise.
+ */
+function isNodeVersionSufficient(nodePath: string): boolean {
+  try {
+    const version = execSync(`"${nodePath}" --version`, { timeout: 5000, encoding: 'utf-8' }).trim()
+    // version looks like "v18.20.1" or "v16.14.0"
+    const major = parseInt(version.replace(/^v/, '').split('.')[0] ?? '0', 10)
+    if (major < 18) {
+      safeLog('warn', `Node.js ${version} is too old (requires >=18), skipping`, { nodePath })
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Find Node.js executable on Windows.
  * cli.js is a Node.js program — Bun's Node.js compat on Windows is insufficient.
+ * Requires Node >= 18 (claude-agent-sdk engine requirement).
  */
 function findNodeExecutable(): string | null {
   if (process.platform !== 'win32') return null
@@ -250,7 +277,7 @@ function findNodeExecutable(): string | null {
   try {
     const whereOutput = execSync('where node', { timeout: 5000, encoding: 'utf-8' }).trim()
     const nodePath = whereOutput.split('\n')[0]?.trim() ?? ''
-    if (nodePath && existsSync(nodePath)) {
+    if (nodePath && existsSync(nodePath) && isNodeVersionSufficient(nodePath)) {
       return nodePath
     }
   } catch {
@@ -264,7 +291,7 @@ function findNodeExecutable(): string | null {
   ].filter(Boolean) as string[]
 
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate
+    if (existsSync(candidate) && isNodeVersionSufficient(candidate)) return candidate
   }
 
   return null
@@ -274,23 +301,22 @@ function resolveRuntimeExecutable(): string {
   const isBundled = process.execPath.includes('.app/') || process.execPath.includes('youclaw-server')
   if (!isBundled) return process.execPath
 
-  // Windows: prefer node.exe because cli.js is a Node.js app
-  // Bun's Node.js compat on Windows is insufficient for Claude Code CLI
-  if (process.platform === 'win32') {
-    const nodePath = findNodeExecutable()
-    if (nodePath) {
-      safeLog('info', 'Using Node.js for SDK subprocess on Windows', { nodePath })
-      return nodePath
-    }
-    safeLog('warn', 'Node.js not found on Windows, falling back to embedded Bun')
-  }
-
-  // Use cached embedded bun path (macOS/Linux, or Windows fallback)
+  // Prefer embedded Bun on all platforms (bundled with the app, no version mismatch issues)
   if (_bunRuntimePath === undefined) {
     _bunRuntimePath = ensureBunRuntime()
   }
   if (_bunRuntimePath && existsSync(_bunRuntimePath)) {
     return _bunRuntimePath
+  }
+
+  // Windows fallback: try system Node.js (>=18) if embedded Bun is unavailable
+  if (process.platform === 'win32') {
+    const nodePath = findNodeExecutable()
+    if (nodePath) {
+      safeLog('info', 'Embedded Bun unavailable, using Node.js for SDK subprocess on Windows', { nodePath })
+      return nodePath
+    }
+    safeLog('warn', 'Neither embedded Bun nor Node.js (>=18) found on Windows')
   }
 
   // Fallback: system bun
