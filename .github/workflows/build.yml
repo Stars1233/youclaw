@@ -34,11 +34,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "You Claw v${{ steps.version.outputs.VERSION }}" \
-            --notes "" \
-            --latest \
-            || echo "Release already exists"
+          TAG="${{ github.ref_name }}"
+          # Beta releases: mark as prerelease, do not promote to latest
+          if [[ "$TAG" == *beta* ]]; then
+            gh release create "$TAG" \
+              --title "You Claw v${{ steps.version.outputs.VERSION }}" \
+              --notes "" \
+              --prerelease \
+              || echo "Release already exists"
+          else
+            gh release create "$TAG" \
+              --title "You Claw v${{ steps.version.outputs.VERSION }}" \
+              --notes "" \
+              --latest \
+              || echo "Release already exists"
+          fi
 
   # ── macOS builds ──
   build-mac:
@@ -465,7 +475,12 @@ jobs:
           echo "=== Downloaded assets ==="
           ls -la assets/
 
-          # Upload assets to OSS (versioned dir + latest dir)
+          # Detect beta release
+          IS_BETA=false
+          [[ "$TAG" == *beta* ]] && IS_BETA=true
+          echo "IS_BETA=${IS_BETA}"
+
+          # Upload assets to OSS (versioned dir; latest dir only for stable releases)
           for f in assets/*; do
             [ ! -f "$f" ] && continue
             NAME=$(basename "$f")
@@ -474,8 +489,10 @@ jobs:
             echo "Uploading: $NAME"
             ossutil cp "$f" "${OSS_BASE}/${NAME}" -f
             # Strip version from filename for stable download link
-            LATEST_NAME=$(echo "$NAME" | sed "s/_${VERSION}//")
-            ossutil cp "$f" "oss://${OSS_BUCKET}/youclaw/releases/latest/${LATEST_NAME}" -f
+            if [ "$IS_BETA" = "false" ]; then
+              LATEST_NAME=$(echo "$NAME" | sed "s/_${VERSION}//")
+              ossutil cp "$f" "oss://${OSS_BUCKET}/youclaw/releases/latest/${LATEST_NAME}" -f
+            fi
           done
 
           echo "=== All .sig files ==="
@@ -544,11 +561,15 @@ jobs:
           echo "=== latest.json ==="
           cat latest.json
 
-          # Upload latest.json to fixed path for updater
-          ossutil cp latest.json "oss://${OSS_BUCKET}/youclaw/releases/latest.json" -f
-
-          # Also upload to GitHub Release as fallback
-          gh release upload "$TAG" latest.json -R "$REPO" --clobber
+          # Upload latest.json: beta only to versioned OSS path, stable to fixed path + GitHub Release
+          ossutil cp latest.json "${OSS_BASE}/latest.json" -f
+          if [ "$IS_BETA" = "false" ]; then
+            # Stable: overwrite the fixed updater endpoint and GitHub Release fallback
+            ossutil cp latest.json "oss://${OSS_BUCKET}/youclaw/releases/latest.json" -f
+            gh release upload "$TAG" latest.json -R "$REPO" --clobber
+          else
+            echo "Beta release — skipping latest.json promotion to stable endpoint"
+          fi
 
       - name: Notify Feishu
         if: always()
