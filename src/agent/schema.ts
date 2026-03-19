@@ -81,7 +81,7 @@ export const SecurityConfigSchema = z.object({
 export const AgentConfigSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  model: z.string().default('minimax/MiniMax-M2.5-highspeed'),
+  model: z.string().default('minimax/MiniMax-M2.7-highspeed'),
   trigger: z.string().optional(),
   requiresTrigger: z.boolean().optional(),
   telegram: z.object({
