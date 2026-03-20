@@ -3,7 +3,6 @@ import {
   deleteSkill,
   getMarketplaceSkills,
   getMySkills,
-  getRecommendedSkills,
   getSkillAgents,
   getSkills,
   toggleSkill,
@@ -13,10 +12,13 @@ import {
   type Skill,
 } from '@/api/client'
 import { AlertTriangle, Store } from 'lucide-react'
+import { SkillImportPanel, type SkillImportProviderId } from '@/components/SkillImportPanel'
 import { SkillEditor } from '@/components/skills/SkillEditor'
 import { InstalledSkillsView } from '@/components/skills/InstalledSkillsView'
 import { MarketplaceView } from '@/components/skills/MarketplaceView'
+import { getExternalSkillSourceLabel } from '@/components/skills/shared-utils'
 import { compareByNewestThenName, type InstalledSkillListItem } from '@/components/skills/skills-view-types'
+import { toMarketplaceResultsViewModel } from '@/lib/marketplace-view-model'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,21 +31,27 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { useAppStore } from '@/stores/app'
 
 type TabType = 'installed' | 'marketplace'
-type BuilderState =
-  | { entity: 'skill'; mode: 'create' }
-  | { entity: 'skill'; mode: 'edit'; skillName: string }
+type InstalledWorkspace =
+  | { kind: 'detail'; skillName: string | null }
+  | { kind: 'create' }
+  | { kind: 'edit'; skillName: string }
+  | { kind: 'import'; provider: SkillImportProviderId }
 
 export function Skills() {
   const { t } = useI18n()
+  const registrySource = useAppStore((state) => state.registrySource)
+  const registrySources = useAppStore((state) => state.registrySources)
+  const setRegistrySource = useAppStore((state) => state.setRegistrySource)
+  const refreshRegistrySources = useAppStore((state) => state.refreshRegistrySources)
+  const showGlobalBubble = useAppStore((state) => state.showGlobalBubble)
   const [tab, setTab] = useState<TabType>('installed')
-  const [builderState, setBuilderState] = useState<BuilderState | null>(null)
+  const [installedWorkspace, setInstalledWorkspace] = useState<InstalledWorkspace>({ kind: 'detail', skillName: null })
 
   const [skills, setSkills] = useState<Skill[]>([])
   const [mySkills, setMySkills] = useState<ManagedSkill[]>([])
-
-  const [selected, setSelected] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleteAffectedAgents, setDeleteAffectedAgents] = useState<Array<{ id: string; name: string }>>([])
 
@@ -65,38 +73,30 @@ export function Skills() {
   const marketplaceLoadMoreRef = useRef<HTMLDivElement | null>(null)
   const marketplacePendingCursorRef = useRef<string | null>(null)
   const listScrollRef = useRef<HTMLDivElement | null>(null)
-  const listScrollTopRef = useRef(0)
 
   const sourceLabels = useMemo<Record<Skill['source'], string>>(() => ({
     workspace: t.skills.workspace,
     builtin: t.skills.builtin,
     user: t.skills.user,
   }), [t.skills.builtin, t.skills.user, t.skills.workspace])
+  const formatSkillMessage = useCallback((template: string, skillName: string) => (
+    template.replace('{name}', skillName)
+  ), [])
 
-  const externalSourceLabels = useMemo<Record<NonNullable<Skill['externalSource']>, string>>(() => ({
-    marketplace: t.skills.sourceMarketplace,
-    imported: t.skills.sourceImported,
-    manual: t.skills.sourceManual,
-  }), [t.skills.sourceImported, t.skills.sourceManual, t.skills.sourceMarketplace])
-
-  const loadSkills = useCallback(() => {
-    getSkills().then((data) => {
-      setSkills(data)
-      window.dispatchEvent(new CustomEvent('skills-changed'))
-    }).catch(() => {})
-  }, [])
-
-  const loadMySkills = useCallback(() => {
-    getMySkills().then((data) => {
-      setMySkills(data)
-    }).catch(() => {})
+  const refreshInstalledData = useCallback(async () => {
+    const [nextSkills, nextMySkills] = await Promise.all([getSkills(), getMySkills()])
+    setSkills(nextSkills)
+    setMySkills(nextMySkills)
+    window.dispatchEvent(new CustomEvent('skills-changed'))
+    return { nextSkills, nextMySkills }
   }, [])
 
   const loadMarketplace = useCallback(
-    (options?: { append?: boolean; cursor?: string | null; query?: string; sort?: MarketplaceSort }) => {
+    (options?: { append?: boolean; cursor?: string | null; query?: string; sort?: MarketplaceSort; source?: typeof registrySource }) => {
       const append = Boolean(options?.append)
       const query = (options?.query ?? searchQuery).trim()
       const sort = options?.sort ?? marketplaceSort
+      const source = options?.source ?? registrySource
       const cursor = append ? (options?.cursor ?? marketplace.nextCursor) : null
 
       if (append) {
@@ -111,17 +111,7 @@ export function Skills() {
       setMarketplaceStatus(append ? 'loading-more' : 'loading')
       setMarketplaceError('')
 
-      const request = query
-        ? getMarketplaceSkills({ query, sort, cursor, limit: 24 })
-        : getRecommendedSkills().then((items) => ({
-            items,
-            nextCursor: null,
-            source: 'fallback' as const,
-            query: '',
-            sort,
-          }))
-
-      request
+      getMarketplaceSkills({ source, query, sort, cursor, limit: 24 })
         .then((page) => {
           setMarketplace((current) => ({
             ...page,
@@ -145,21 +135,21 @@ export function Skills() {
           setMarketplaceAppendError(error instanceof Error ? error.message : t.skills.marketplaceLoadFailed)
         })
     },
-    [marketplace.nextCursor, marketplaceSort, searchQuery, t.skills.marketplaceLoadFailed],
+    [marketplace.nextCursor, marketplaceSort, registrySource, searchQuery, t.skills.marketplaceLoadFailed],
   )
 
   useEffect(() => {
-    loadSkills()
-    loadMySkills()
-  }, [loadMySkills, loadSkills])
+    refreshInstalledData().catch(() => {})
+    void refreshRegistrySources()
+  }, [refreshInstalledData, refreshRegistrySources])
 
   useEffect(() => {
     if (tab !== 'marketplace') return
     const timer = window.setTimeout(() => {
-      loadMarketplace({ query: searchQuery })
+      loadMarketplace({ query: searchQuery, source: registrySource })
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [loadMarketplace, marketplaceSort, searchQuery, tab])
+  }, [loadMarketplace, marketplaceSort, registrySource, searchQuery, tab])
 
   useEffect(() => {
     if (!deleteTarget) return
@@ -172,7 +162,8 @@ export function Skills() {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
   }, [])
 
-  const selectedSkill = skills.find((skill) => skill.name === selected)
+  const selectedSkillName = installedWorkspace.kind === 'detail' ? installedWorkspace.skillName : null
+  const selectedSkill = skills.find((skill) => skill.name === selectedSkillName)
   const editableSkills = mySkills.filter((skill) => skill.editable)
   const editableSkillNames = useMemo(() => new Set(editableSkills.map((skill) => skill.name)), [editableSkills])
 
@@ -201,11 +192,11 @@ export function Skills() {
         kind: 'installed',
         name: skill.name,
         description: skill.frontmatter.description || t.skills.skillDescriptionFallback,
-        sourceLabel: skill.externalSource ? externalSourceLabels[skill.externalSource] : t.skills.user,
+        sourceLabel: getExternalSkillSourceLabel(skill, t),
         skill,
         sortTimestamp: skill.sortTimestamp,
       }))
-  ), [editableSkillNames, externalSourceLabels, skills, t.skills.skillDescriptionFallback, t.skills.user])
+  ), [editableSkillNames, skills, t, t.skills.skillDescriptionFallback])
 
   const builtinSkillItems = useMemo<InstalledSkillListItem[]>(() => (
     skills
@@ -221,26 +212,27 @@ export function Skills() {
       }))
   ), [editableSkillNames, skills, sourceLabels, t.skills.skillDescriptionFallback])
 
-  const canLoadMore = searchQuery.trim().length > 0 && Boolean(marketplace.nextCursor)
-  const canAutoLoadMore = canLoadMore && !marketplaceAppendError
+  const canAutoLoadMore = Boolean(searchQuery.trim()) && Boolean(marketplace.nextCursor) && !marketplaceAppendError
+  const marketplaceResultsViewModel = useMemo(
+    () => toMarketplaceResultsViewModel(marketplace, searchQuery, marketplaceAppendError, t),
+    [marketplace, marketplaceAppendError, searchQuery, t],
+  )
 
   const openSkillBuilder = useCallback((skillName: string) => {
-    listScrollTopRef.current = listScrollRef.current?.scrollTop ?? 0
-    setBuilderState({ entity: 'skill', mode: 'edit', skillName })
+    setInstalledWorkspace({ kind: 'edit', skillName })
   }, [])
 
   const handleMarketplaceLoadMore = useCallback(() => {
     if (!canAutoLoadMore || marketplaceStatus !== 'idle') return
-    loadMarketplace({ append: true })
-  }, [canAutoLoadMore, loadMarketplace, marketplaceStatus])
+    loadMarketplace({ append: true, source: registrySource })
+  }, [canAutoLoadMore, loadMarketplace, marketplaceStatus, registrySource])
 
   const handleMarketplaceChanged = useCallback(() => {
-    loadSkills()
-    loadMySkills()
+    refreshInstalledData().catch(() => {})
     if (tab === 'marketplace') {
-      loadMarketplace({ query: searchQuery })
+      loadMarketplace({ query: searchQuery, source: registrySource })
     }
-  }, [loadMarketplace, loadMySkills, loadSkills, searchQuery, tab])
+  }, [loadMarketplace, refreshInstalledData, registrySource, searchQuery, tab])
 
   useEffect(() => {
     const container = marketplaceScrollRef.current
@@ -264,129 +256,186 @@ export function Skills() {
     return () => observer.disconnect()
   }, [canAutoLoadMore, handleMarketplaceLoadMore])
 
-  useEffect(() => {
-    if (builderState || tab !== 'installed') return
-    const container = listScrollRef.current
-    if (!container) return
-    const restore = window.requestAnimationFrame(() => {
-      container.scrollTop = listScrollTopRef.current
-    })
-    return () => window.cancelAnimationFrame(restore)
-  }, [builderState, tab])
-
   const handleSearchChange = useCallback((value: string) => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     searchTimerRef.current = setTimeout(() => setSearchQuery(value), 300)
   }, [])
+
+  const handleImportSuccess = useCallback(async () => {
+    const existingNames = new Set(skills.map((skill) => skill.name))
+    const { nextSkills } = await refreshInstalledData()
+    const importedSkill = nextSkills
+      .filter((skill) => skill.catalogGroup === 'user' && !existingNames.has(skill.name))
+      .sort(compareByNewestThenName)[0]
+
+    setInstalledWorkspace({
+      kind: 'detail',
+      skillName: importedSkill?.name ?? selectedSkillName ?? null,
+    })
+  }, [refreshInstalledData, selectedSkillName, skills])
 
   const closeDeleteDialog = useCallback(() => {
     setDeleteTarget(null)
     setDeleteAffectedAgents([])
   }, [])
 
-  return (
-    <div className="flex h-full flex-col">
-      {builderState ? (
+  const installedWorkspaceContent = useMemo(() => {
+    if (installedWorkspace.kind === 'create') {
+      return (
         <SkillEditor
-          mode={builderState.mode}
-          skillName={builderState.mode === 'edit' ? builderState.skillName : null}
+          mode="create"
+          skillName={null}
           onBack={() => {
-            setBuilderState(null)
-            setTab('installed')
+            setInstalledWorkspace({ kind: 'detail', skillName: null })
           }}
           onSkillSelected={(skillName) => {
-            setSelected(null)
             if (skillName) {
-              setBuilderState({ entity: 'skill', mode: 'edit', skillName })
-            } else {
-              setBuilderState(null)
+              setInstalledWorkspace({ kind: 'edit', skillName })
+              return
             }
+            setInstalledWorkspace({ kind: 'detail', skillName: null })
           }}
           onSkillsChanged={() => {
-            void loadMySkills()
-            void loadSkills()
+            void refreshInstalledData()
           }}
         />
-      ) : (
-        <>
-          <div className="border-b border-border px-4 py-3">
-            <div className="inline-flex items-center gap-1 rounded-xl bg-muted/60 p-1">
-              <button
-                data-testid="skills-installed-tab"
-                onClick={() => setTab('installed')}
-                className={cn(
-                  'rounded-lg px-4 py-1.5 text-sm font-medium transition-all',
-                  tab === 'installed'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {t.skills.installed}
-              </button>
-              <button
-                data-testid="skills-marketplace-tab"
-                onClick={() => setTab('marketplace')}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all',
-                  tab === 'marketplace'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <Store className="h-3.5 w-3.5" />
-                {t.skills.marketplace}
-              </button>
-            </div>
-          </div>
+      )
+    }
 
-          {tab === 'installed' && (
-            <InstalledSkillsView
-              builtinSkillItems={builtinSkillItems}
-              externalSkillItems={externalSkillItems}
-              customSkillItems={customSkillItems}
-              selectedSkill={selectedSkill}
-              selected={selected}
-              setSelected={setSelected}
-              onEditSkill={openSkillBuilder}
-              onCreateSkill={() => {
-                listScrollTopRef.current = listScrollRef.current?.scrollTop ?? 0
-                setSelected(null)
-                setBuilderState({ entity: 'skill', mode: 'create' })
-              }}
-              onToggleSkill={async (skillName, enabled) => {
-                await toggleSkill(skillName, enabled)
-                loadSkills()
-              }}
-              onDeleteSkill={(skillName) => setDeleteTarget(skillName)}
-              onReloadSkills={loadSkills}
-              listRef={listScrollRef}
-              onListScroll={(top) => {
-                listScrollTopRef.current = top
-              }}
-            />
-          )}
+    if (installedWorkspace.kind === 'edit') {
+      return (
+        <SkillEditor
+          mode="edit"
+          skillName={installedWorkspace.skillName}
+          onBack={() => {
+            setInstalledWorkspace({ kind: 'detail', skillName: installedWorkspace.skillName })
+          }}
+          onSkillSelected={(skillName) => {
+            if (skillName) {
+              setInstalledWorkspace({ kind: 'edit', skillName })
+              return
+            }
+            setInstalledWorkspace({ kind: 'detail', skillName: null })
+          }}
+          onSkillsChanged={() => {
+            void refreshInstalledData()
+          }}
+        />
+      )
+    }
 
-          {tab === 'marketplace' && (
-            <MarketplaceView
-              marketplace={marketplace}
-              marketplaceStatus={marketplaceStatus}
-              marketplaceError={marketplaceError}
-              marketplaceAppendError={marketplaceAppendError}
-              marketplaceSort={marketplaceSort}
-              setMarketplaceSort={setMarketplaceSort}
-              searchQuery={searchQuery}
-              handleSearchChange={handleSearchChange}
-              onChanged={handleMarketplaceChanged}
-              onLoadMore={handleMarketplaceLoadMore}
-              onRetryLoadMore={() => {
-                setMarketplaceAppendError('')
-                loadMarketplace({ append: true })
-              }}
-              marketplaceScrollRef={marketplaceScrollRef}
-              marketplaceLoadMoreRef={marketplaceLoadMoreRef}
-            />
-          )}
-        </>
+    if (installedWorkspace.kind === 'import') {
+      return (
+        <SkillImportPanel
+          mode={installedWorkspace.provider}
+          onImported={handleImportSuccess}
+        />
+      )
+    }
+
+    return undefined
+  }, [handleImportSuccess, installedWorkspace, refreshInstalledData])
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b border-border px-4 py-3">
+        <div className="inline-flex items-center gap-1 rounded-xl bg-muted/60 p-1">
+          <button
+            data-testid="skills-installed-tab"
+            onClick={() => setTab('installed')}
+            className={cn(
+              'rounded-lg px-4 py-1.5 text-sm font-medium transition-all',
+              tab === 'installed'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {t.skills.installed}
+          </button>
+          <button
+            data-testid="skills-marketplace-tab"
+            onClick={() => setTab('marketplace')}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all',
+              tab === 'marketplace'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Store className="h-3.5 w-3.5" />
+            {t.skills.marketplace}
+          </button>
+        </div>
+      </div>
+
+      {tab === 'installed' && (
+        <InstalledSkillsView
+          builtinSkillItems={builtinSkillItems}
+          externalSkillItems={externalSkillItems}
+          customSkillItems={customSkillItems}
+          selectedSkill={selectedSkill}
+          selected={selectedSkillName}
+          setSelected={(skillName) => setInstalledWorkspace({ kind: 'detail', skillName })}
+          onEditSkill={openSkillBuilder}
+          onCreateSkill={() => {
+            setInstalledWorkspace({ kind: 'create' })
+          }}
+          onImportSkill={(provider) => {
+            setInstalledWorkspace({ kind: 'import', provider })
+          }}
+          onToggleSkill={async (skillName, enabled) => {
+            try {
+              await toggleSkill(skillName, enabled)
+              await refreshInstalledData()
+              showGlobalBubble({
+                message: formatSkillMessage(
+                  enabled ? t.skills.skillEnabledSuccess : t.skills.skillDisabledSuccess,
+                  skillName,
+                ),
+              })
+            } catch (error) {
+              showGlobalBubble({
+                type: 'error',
+                message: error instanceof Error && error.message
+                  ? error.message
+                  : formatSkillMessage(
+                    enabled ? t.skills.skillEnableFailed : t.skills.skillDisableFailed,
+                    skillName,
+                  ),
+              })
+            }
+          }}
+          onDeleteSkill={(skillName) => setDeleteTarget(skillName)}
+          onReloadSkills={() => {
+            void refreshInstalledData()
+          }}
+          listRef={listScrollRef}
+          workspaceContent={installedWorkspaceContent}
+        />
+      )}
+
+      {tab === 'marketplace' && (
+        <MarketplaceView
+          resultsViewModel={marketplaceResultsViewModel}
+          marketplaceStatus={marketplaceStatus}
+          marketplaceError={marketplaceError}
+          marketplaceAppendError={marketplaceAppendError}
+          marketplaceSort={marketplaceSort}
+          setMarketplaceSort={setMarketplaceSort}
+          registrySource={registrySource}
+          registrySources={registrySources}
+          onRegistrySourceChange={setRegistrySource}
+          searchQuery={searchQuery}
+          handleSearchChange={handleSearchChange}
+          onChanged={handleMarketplaceChanged}
+          onLoadMore={handleMarketplaceLoadMore}
+          onRetryLoadMore={() => {
+            setMarketplaceAppendError('')
+            loadMarketplace({ append: true, source: registrySource })
+          }}
+          marketplaceScrollRef={marketplaceScrollRef}
+          marketplaceLoadMoreRef={marketplaceLoadMoreRef}
+        />
       )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && closeDeleteDialog()}>
@@ -414,12 +463,21 @@ export function Skills() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 if (!deleteTarget) return
+                const skillName = deleteTarget
                 try {
-                  await deleteSkill(deleteTarget)
-                  setSelected(null)
-                  loadSkills()
+                  await deleteSkill(skillName)
+                  setInstalledWorkspace({ kind: 'detail', skillName: null })
+                  await refreshInstalledData()
+                  showGlobalBubble({
+                    message: formatSkillMessage(t.skills.skillDeleteSuccess, skillName),
+                  })
                 } catch (error) {
-                  console.error('Failed to delete skill:', error)
+                  showGlobalBubble({
+                    type: 'error',
+                    message: error instanceof Error && error.message
+                      ? error.message
+                      : formatSkillMessage(t.skills.skillDeleteFailed, skillName),
+                  })
                 }
                 closeDeleteDialog()
               }}

@@ -9,8 +9,12 @@ interface MarkdownAuthoringEditorProps {
   version?: string
   description?: string
   value: string
-  onChange: (value: string) => void
+  onChange?: (value: string) => void
   placeholder?: string
+  readOnly?: boolean
+  defaultMode?: 'markdown' | 'preview'
+  hideHeader?: boolean
+  bare?: boolean
 }
 
 export function MarkdownAuthoringEditor({
@@ -20,27 +24,33 @@ export function MarkdownAuthoringEditor({
   value,
   onChange,
   placeholder,
+  readOnly = false,
+  defaultMode = 'markdown',
+  hideHeader = false,
+  bare = false,
 }: MarkdownAuthoringEditorProps) {
-  const [mode, setMode] = useState<'markdown' | 'preview'>('markdown')
+  const [mode, setMode] = useState<'markdown' | 'preview'>(defaultMode)
 
   return (
-    <div className="rounded-3xl border border-border bg-background/60 p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="truncate text-sm font-semibold">{title}</div>
-            {version && (
-              <Badge variant="outline" className="shrink-0 text-[10px]">
-                v{version}
-              </Badge>
+    <div className={bare ? '' : 'rounded-3xl border border-border bg-background/60 p-5'}>
+      <div className="mb-4 flex items-center justify-end gap-2">
+        {!hideHeader && (
+          <div className="mr-auto min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="truncate text-sm font-semibold">{title}</div>
+              {version && (
+                <Badge variant="outline" className="shrink-0 text-[10px]">
+                  v{version}
+                </Badge>
+              )}
+            </div>
+            {description && (
+              <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                {description}
+              </div>
             )}
           </div>
-          {description && (
-            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-              {description}
-            </div>
-          )}
-        </div>
+        )}
         <div className="flex shrink-0 gap-2">
           <Button
             type="button"
@@ -62,13 +72,19 @@ export function MarkdownAuthoringEditor({
       </div>
 
       {mode === 'markdown' ? (
-        <Textarea
-          rows={30}
-          className="min-h-[620px] font-mono text-xs"
-          value={value}
-          placeholder={placeholder}
-          onChange={(event) => onChange(event.target.value)}
-        />
+        readOnly ? (
+          <pre className="min-h-[620px] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-border bg-background/50 p-4 font-mono text-xs leading-6">
+            {value}
+          </pre>
+        ) : (
+          <Textarea
+            rows={30}
+            className="min-h-[620px] font-mono text-xs"
+            value={value}
+            placeholder={placeholder}
+            onChange={(event) => onChange?.(event.target.value)}
+          />
+        )
       ) : (
         <MarkdownPreview markdown={value} plain />
       )}

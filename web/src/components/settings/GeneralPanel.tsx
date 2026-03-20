@@ -1,23 +1,35 @@
-import { useState, useEffect, useCallback } from "react"
-import { useI18n } from "@/i18n"
-import { useAppStore } from "@/stores/app"
-import type { Theme } from "@/hooks/useTheme"
-import { Sun, Moon, Monitor } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { isTauri, updateCachedBaseUrl, savePreferredPort } from "@/api/transport"
+import { useState, useEffect, useCallback } from 'react'
+import { useI18n } from '@/i18n'
+import { useAppStore } from '@/stores/app'
+import type { Theme } from '@/hooks/useTheme'
+import { Sun, Moon, Monitor } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  getSettings,
+  updateSettings,
+  type RegistrySelectableSource,
+  type SettingsDTO,
+} from '@/api/client'
+import { getTauriInvoke, isTauri, updateCachedBaseUrl, savePreferredPort } from '@/api/transport'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-const themeOptions: { value: Theme; labelKey: "dark" | "light" | "system"; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
-  { value: "light", labelKey: "light", icon: Sun },
-  { value: "dark", labelKey: "dark", icon: Moon },
-  { value: "system", labelKey: "system", icon: Monitor },
+const themeOptions: { value: Theme; labelKey: 'dark' | 'light' | 'system'; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+  { value: 'light', labelKey: 'light', icon: Sun },
+  { value: 'dark', labelKey: 'dark', icon: Moon },
+  { value: 'system', labelKey: 'system', icon: Monitor },
 ]
 
 const languageOptions = [
-  { value: "en", label: "English (US)" },
-  { value: "zh", label: "简体中文" },
+  { value: 'en', label: 'English (US)' },
+  { value: 'zh', label: '简体中文' },
 ] as const
+
+const registrySourceOptions: Array<{ value: RegistrySelectableSource; label: string }> = [
+  { value: 'clawhub', label: 'ClawHub' },
+  { value: 'tencent', label: 'Tencent' },
+]
 
 export function GeneralPanel() {
   const { t } = useI18n()
@@ -25,14 +37,19 @@ export function GeneralPanel() {
   const setTheme = useAppStore((s) => s.setTheme)
   const locale = useAppStore((s) => s.locale)
   const setLocale = useAppStore((s) => s.setLocale)
+  const refreshRegistrySources = useAppStore((s) => s.refreshRegistrySources)
 
-  // Port config state (Tauri only)
-  const [portValue, setPortValue] = useState("62601")
+  const [portValue, setPortValue] = useState('62601')
   const [portSaved, setPortSaved] = useState(false)
   const [portRestarting, setPortRestarting] = useState(false)
-  const [portMessage, setPortMessage] = useState("")
+  const [portMessage, setPortMessage] = useState('')
 
-  // Load preferred_port from Tauri Store on mount
+  const [settingsState, setSettingsState] = useState<SettingsDTO | null>(null)
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsMessage, setSettingsMessage] = useState('')
+  const [settingsError, setSettingsError] = useState('')
+
   useEffect(() => {
     if (!isTauri) return
     import('@tauri-apps/plugin-store').then(({ load }) => {
@@ -42,6 +59,31 @@ export function GeneralPanel() {
       })
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setSettingsLoading(true)
+    getSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          setSettingsState(settings)
+          setSettingsError('')
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setSettingsError(error instanceof Error ? error.message : t.skills.requestFailed)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSettingsLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [t.skills.requestFailed])
 
   const savePortToStore = useCallback(async (port: number) => {
     await savePreferredPort(port)
@@ -53,7 +95,7 @@ export function GeneralPanel() {
     try {
       await savePortToStore(port)
       setPortSaved(true)
-      setPortMessage("")
+      setPortMessage('')
       setTimeout(() => setPortSaved(false), 3000)
     } catch (err) {
       console.error('Failed to save port:', err)
@@ -64,17 +106,14 @@ export function GeneralPanel() {
     const port = parseInt(portValue, 10)
     if (isNaN(port) || port < 1024 || port > 65535) return
     setPortRestarting(true)
-    setPortMessage("")
+    setPortMessage('')
     try {
-      // Save port first, then restart
       await savePortToStore(port)
       const invoke = getTauriInvoke()
       await invoke('restart_sidecar')
       updateCachedBaseUrl(`http://localhost:${port}`)
-      // Reload to reconnect all SSE/API connections to new port
       window.location.reload()
     } catch (err) {
-      // Dev mode or restart failure: update cache anyway, show hint
       const errMsg = String(err)
       updateCachedBaseUrl(`http://localhost:${port}`)
       setPortSaved(true)
@@ -83,9 +122,46 @@ export function GeneralPanel() {
     }
   }, [portValue, savePortToStore, t])
 
+  const updateRegistryField = useCallback((source: RegistrySelectableSource, field: string, value: string | boolean) => {
+    setSettingsState((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        registrySources: {
+          ...current.registrySources,
+          [source]: {
+            ...current.registrySources[source],
+            [field]: value,
+          },
+        },
+      }
+    })
+    setSettingsMessage('')
+    setSettingsError('')
+  }, [])
+
+  const handleSaveRegistrySettings = useCallback(async () => {
+    if (!settingsState) return
+    setSettingsSaving(true)
+    setSettingsMessage('')
+    setSettingsError('')
+    try {
+      const updated = await updateSettings({
+        defaultRegistrySource: settingsState.defaultRegistrySource,
+        registrySources: settingsState.registrySources,
+      })
+      setSettingsState(updated)
+      await refreshRegistrySources()
+      setSettingsMessage(t.settings.registrySaved)
+    } catch (error) {
+      setSettingsError(error instanceof Error ? error.message : t.skills.requestFailed)
+    } finally {
+      setSettingsSaving(false)
+    }
+  }, [refreshRegistrySources, settingsState, t.settings.registrySaved, t.skills.requestFailed])
+
   return (
     <div className="space-y-8">
-      {/* Theme */}
       <div>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
           {t.settings.appearance}
@@ -98,17 +174,17 @@ export function GeneralPanel() {
                 key={option.value}
                 onClick={() => setTheme(option.value)}
                 className={cn(
-                  "p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-3",
+                  'p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-3',
                   theme === option.value
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-muted-foreground/30"
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-muted-foreground/30',
                 )}
               >
                 <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center",
+                  'w-10 h-10 rounded-xl flex items-center justify-center',
                   theme === option.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground',
                 )}>
                   <Icon size={20} />
                 </div>
@@ -119,7 +195,6 @@ export function GeneralPanel() {
         </div>
       </div>
 
-      {/* Language */}
       <div>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
           {t.settings.language}
@@ -130,10 +205,10 @@ export function GeneralPanel() {
               key={option.value}
               onClick={() => setLocale(option.value)}
               className={cn(
-                "px-6 py-3 rounded-xl border-2 text-sm font-medium transition-all",
+                'px-6 py-3 rounded-xl border-2 text-sm font-medium transition-all',
                 locale === option.value
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border text-muted-foreground hover:border-muted-foreground/30"
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-border text-muted-foreground hover:border-muted-foreground/30',
               )}
             >
               {option.label}
@@ -142,7 +217,136 @@ export function GeneralPanel() {
         </div>
       </div>
 
-      {/* Server Port (Tauri only) */}
+      <div className="space-y-4">
+        <div>
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+            {t.settings.marketplace}
+          </h4>
+          <p className="text-xs text-muted-foreground">{t.settings.marketplaceHint}</p>
+        </div>
+
+        {settingsLoading && <p className="text-sm text-muted-foreground">{t.common.loading}</p>}
+
+        {!settingsLoading && settingsState && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-border p-4 space-y-3">
+              <div className="space-y-1">
+                <div className="text-sm font-medium">{t.settings.marketplaceDefaultSource}</div>
+                <div className="text-xs text-muted-foreground">{t.settings.marketplaceDefaultSourceHint}</div>
+              </div>
+              <Select
+                value={settingsState.defaultRegistrySource ?? '__none__'}
+                onValueChange={(value) => {
+                  setSettingsState((current) => current ? {
+                    ...current,
+                    defaultRegistrySource: value === '__none__' ? undefined : value as RegistrySelectableSource,
+                  } : current)
+                  setSettingsMessage('')
+                  setSettingsError('')
+                }}
+              >
+                <SelectTrigger className="w-full max-w-sm">
+                  <SelectValue placeholder={t.settings.marketplaceFollowLocale} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t.settings.marketplaceFollowLocale}</SelectItem>
+                  {registrySourceOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="rounded-2xl border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">ClawHub</div>
+                    <div className="text-xs text-muted-foreground">{t.settings.marketplaceSourceClawhubHint}</div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={settingsState.registrySources.clawhub.enabled}
+                      onChange={(event) => updateRegistryField('clawhub', 'enabled', event.target.checked)}
+                    />
+                    <span>{t.settings.marketplaceEnabled}</span>
+                  </label>
+                </div>
+                <label className="space-y-2 block">
+                  <span className="text-xs font-medium text-muted-foreground">API Base URL</span>
+                  <Input
+                    value={settingsState.registrySources.clawhub.apiBaseUrl}
+                    onChange={(event) => updateRegistryField('clawhub', 'apiBaseUrl', event.target.value)}
+                  />
+                </label>
+                <label className="space-y-2 block">
+                  <span className="text-xs font-medium text-muted-foreground">Download URL</span>
+                  <Input
+                    value={settingsState.registrySources.clawhub.downloadUrl}
+                    onChange={(event) => updateRegistryField('clawhub', 'downloadUrl', event.target.value)}
+                  />
+                </label>
+                <label className="space-y-2 block">
+                  <span className="text-xs font-medium text-muted-foreground">Token</span>
+                  <Input
+                    value={settingsState.registrySources.clawhub.token}
+                    onChange={(event) => updateRegistryField('clawhub', 'token', event.target.value)}
+                    placeholder={t.settings.marketplaceTokenPlaceholder}
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-2xl border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">Tencent</div>
+                    <div className="text-xs text-muted-foreground">{t.settings.marketplaceSourceTencentHint}</div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={settingsState.registrySources.tencent.enabled}
+                      onChange={(event) => updateRegistryField('tencent', 'enabled', event.target.checked)}
+                    />
+                    <span>{t.settings.marketplaceEnabled}</span>
+                  </label>
+                </div>
+                <label className="space-y-2 block">
+                  <span className="text-xs font-medium text-muted-foreground">Index URL</span>
+                  <Input
+                    value={settingsState.registrySources.tencent.indexUrl}
+                    onChange={(event) => updateRegistryField('tencent', 'indexUrl', event.target.value)}
+                  />
+                </label>
+                <label className="space-y-2 block">
+                  <span className="text-xs font-medium text-muted-foreground">Search URL</span>
+                  <Input
+                    value={settingsState.registrySources.tencent.searchUrl}
+                    onChange={(event) => updateRegistryField('tencent', 'searchUrl', event.target.value)}
+                  />
+                </label>
+                <label className="space-y-2 block">
+                  <span className="text-xs font-medium text-muted-foreground">Download URL</span>
+                  <Input
+                    value={settingsState.registrySources.tencent.downloadUrl}
+                    onChange={(event) => updateRegistryField('tencent', 'downloadUrl', event.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button onClick={() => void handleSaveRegistrySettings()} disabled={settingsSaving}>
+                {settingsSaving ? t.settings.saving : t.common.save}
+              </Button>
+              {settingsMessage && <span className="text-sm text-green-500">{settingsMessage}</span>}
+              {settingsError && <span className="text-sm text-red-400">{settingsError}</span>}
+            </div>
+          </div>
+        )}
+      </div>
+
       {isTauri && (
         <div>
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
@@ -155,7 +359,7 @@ export function GeneralPanel() {
               min={1024}
               max={65535}
               value={portValue}
-              onChange={(e) => { setPortValue(e.target.value); setPortSaved(false); setPortMessage("") }}
+              onChange={(e) => { setPortValue(e.target.value); setPortSaved(false); setPortMessage('') }}
               className="w-32 rounded-xl"
             />
             <Button
@@ -182,7 +386,6 @@ export function GeneralPanel() {
           )}
         </div>
       )}
-
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { Logs } from './pages/Logs'
 import { Login } from './pages/Login'
 import { GitSetup } from './pages/GitSetup'
 import { PortConflictDialog } from './components/PortConflictDialog'
+import { GlobalBubble } from './components/GlobalBubble'
 import { useTheme } from './hooks/useTheme'
 import { useAppStore } from './stores/app'
 import { isTauri, updateCachedBaseUrl } from './api/transport'
@@ -160,6 +161,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to={canPass ? "/" : "/login"} replace />} />
       </Routes>
+      <GlobalBubble />
       {isTauri && <PortConflictDialog open={portConflict} onResolved={() => setPortConflict(false)} />}
     </BrowserRouter>
   )

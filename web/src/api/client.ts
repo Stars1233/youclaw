@@ -198,6 +198,52 @@ export interface EligibilityDetail {
   env: { passed: boolean; results: Array<{ name: string; found: boolean }> }
 }
 
+export const RegistryMarketplaceSource = {
+  ClawHub: 'clawhub',
+  Tencent: 'tencent',
+} as const
+
+export type RegistryMarketplaceSource = typeof RegistryMarketplaceSource[keyof typeof RegistryMarketplaceSource]
+
+export const SkillImportProvider = {
+  RawUrl: 'raw-url',
+  GitHub: 'github',
+} as const
+
+export type SkillImportProvider = typeof SkillImportProvider[keyof typeof SkillImportProvider]
+
+interface SkillRegistryMetaBase {
+  slug: string
+  installedAt: string
+  displayName?: string
+  version?: string
+}
+
+export interface MarketplaceSkillRegistryMeta extends SkillRegistryMetaBase {
+  source: RegistryMarketplaceSource
+  homepageUrl?: string
+}
+
+export interface RawUrlSkillRegistryMeta extends SkillRegistryMetaBase {
+  source: typeof SkillImportProvider.RawUrl
+  provider: typeof SkillImportProvider.RawUrl
+  sourceUrl: string
+}
+
+export interface GitHubSkillRegistryMeta extends SkillRegistryMetaBase {
+  source: typeof SkillImportProvider.GitHub
+  provider: typeof SkillImportProvider.GitHub
+  sourceUrl: string
+  homepageUrl?: string
+  ref?: string
+  path?: string
+}
+
+export type SkillRegistryMeta =
+  | MarketplaceSkillRegistryMeta
+  | RawUrlSkillRegistryMeta
+  | GitHubSkillRegistryMeta
+
 export interface Skill {
   name: string
   source: 'workspace' | 'builtin' | 'user'
@@ -213,13 +259,7 @@ export interface Skill {
   eligibilityDetail: EligibilityDetail
   enabled: boolean
   usable: boolean
-  registryMeta?: {
-    source: string
-    slug: string
-    installedAt: string
-    displayName?: string
-    version?: string
-  }
+  registryMeta?: SkillRegistryMeta
 }
 
 export interface SkillAuthoringDraft {
@@ -421,6 +461,64 @@ export async function unbindSkillFromAgent(name: string, agentId: string) {
   })
 }
 
+export interface ImportProviderInfoDTO {
+  id: 'raw-url' | 'github'
+  label: string
+  description: string
+  capabilities: {
+    probe: boolean
+    singleFile: boolean
+    directoryTree: boolean
+    auth: 'none' | 'optional' | 'required'
+  }
+}
+
+export interface ImportProbeResponse {
+  provider: 'raw-url' | 'github'
+  ok: boolean
+  suggestedName?: string
+  summary?: string
+  metadata?: Record<string, unknown>
+}
+
+export async function getImportProviders() {
+  return apiFetch<ImportProviderInfoDTO[]>('/api/skills/import/providers')
+}
+
+export async function probeRawUrlImport(data: { url: string; targetDir?: string }) {
+  return apiFetch<ImportProbeResponse>(
+    '/api/skills/import/raw-url/probe',
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    },
+  )
+}
+
+export async function importFromRawUrl(data: { url: string; targetDir?: string }) {
+  return apiFetch<{ ok: boolean }>('/api/skills/import/raw-url', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function probeGitHubSkillImport(data: { repoUrl: string; path?: string; ref?: string; targetDir?: string }) {
+  return apiFetch<ImportProbeResponse>(
+    '/api/skills/import/github/probe',
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    },
+  )
+}
+
+export async function importFromGitHub(data: { repoUrl: string; path?: string; ref?: string; targetDir?: string }) {
+  return apiFetch<{ ok: boolean }>('/api/skills/import/github', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 // ===== Skill Marketplace API =====
 
 export type MarketplaceSort =
@@ -430,6 +528,39 @@ export type MarketplaceSort =
   | 'installsCurrent'
   | 'installsAllTime'
   | 'trending'
+
+export type MarketplaceCategory =
+  | 'agent'
+  | 'memory'
+  | 'documents'
+  | 'media'
+  | 'productivity'
+  | 'security'
+  | 'integrations'
+  | 'data'
+  | 'coding'
+  | 'other'
+  | 'search'
+  | 'browser'
+
+export type RegistrySourceId = 'clawhub' | 'tencent' | 'fallback'
+export type RegistrySelectableSource = Exclude<RegistrySourceId, 'fallback'>
+
+export interface RegistrySourceInfo {
+  id: RegistrySelectableSource
+  label: string
+  description: string
+  capabilities: {
+    search: boolean
+    list: boolean
+    detail: boolean
+    download: boolean
+    update: boolean
+    auth: 'none' | 'optional' | 'required'
+    cursorPagination: boolean
+    sorts: MarketplaceSort[]
+  }
+}
 
 export interface MarketplaceSkill {
   slug: string
@@ -449,12 +580,14 @@ export interface MarketplaceSkill {
   installsCurrent?: number | null
   installsAllTime?: number | null
   tags: string[]
-  category?: string
-  source: 'clawhub' | 'fallback'
+  category?: MarketplaceCategory
+  source: RegistrySourceId
+  detailUrl?: string | null
   metadata?: {
     os: string[]
     systems: string[]
   }
+  homepageUrl?: string | null
 }
 
 export interface MarketplaceSkillDetail extends MarketplaceSkill {
@@ -472,18 +605,20 @@ export interface MarketplaceSkillDetail extends MarketplaceSkill {
 export interface MarketplacePage {
   items: MarketplaceSkill[]
   nextCursor: string | null
-  source: 'clawhub' | 'fallback'
+  source: RegistrySourceId
   query: string
   sort: MarketplaceSort
 }
 
 export async function getMarketplaceSkills(params: {
+  source?: RegistrySelectableSource
   query?: string
   cursor?: string | null
   limit?: number
   sort?: MarketplaceSort
 } = {}) {
   const search = new URLSearchParams()
+  if (params.source) search.set('source', params.source)
   if (params.query) search.set('q', params.query)
   if (params.cursor) search.set('cursor', params.cursor)
   if (params.limit) search.set('limit', String(params.limit))
@@ -496,32 +631,39 @@ export async function getRecommendedSkills() {
   return apiFetch<MarketplaceSkill[]>('/api/registry/recommended')
 }
 
-export async function getMarketplaceSkill(slug: string) {
-  return apiFetch<MarketplaceSkillDetail>(`/api/registry/marketplace/${encodeURIComponent(slug)}`)
+export async function getRegistrySources() {
+  return apiFetch<RegistrySourceInfo[]>('/api/registry/sources')
 }
 
-export async function searchRegistrySkills(query: string) {
-  return apiFetch<MarketplaceSkill[]>(`/api/registry/search?q=${encodeURIComponent(query)}`)
+export async function getMarketplaceSkill(slug: string, source?: RegistrySelectableSource) {
+  const suffix = source ? `?source=${encodeURIComponent(source)}` : ''
+  return apiFetch<MarketplaceSkillDetail>(`/api/registry/marketplace/${encodeURIComponent(slug)}${suffix}`)
 }
 
-export async function installRecommendedSkill(slug: string) {
+export async function searchRegistrySkills(query: string, source?: RegistrySelectableSource) {
+  const search = new URLSearchParams({ q: query })
+  if (source) search.set('source', source)
+  return apiFetch<MarketplaceSkill[]>(`/api/registry/search?${search.toString()}`)
+}
+
+export async function installRecommendedSkill(slug: string, source?: RegistrySelectableSource) {
   return apiFetch<{ ok: boolean; error?: string }>('/api/registry/install', {
     method: 'POST',
-    body: JSON.stringify({ slug }),
+    body: JSON.stringify({ slug, source }),
   })
 }
 
-export async function updateMarketplaceSkill(slug: string) {
+export async function updateMarketplaceSkill(slug: string, source?: RegistrySelectableSource) {
   return apiFetch<{ ok: boolean; error?: string }>('/api/registry/update', {
     method: 'POST',
-    body: JSON.stringify({ slug }),
+    body: JSON.stringify({ slug, source }),
   })
 }
 
-export async function uninstallRecommendedSkill(slug: string) {
+export async function uninstallRecommendedSkill(slug: string, source?: RegistrySelectableSource) {
   return apiFetch<{ ok: boolean; error?: string }>('/api/registry/uninstall', {
     method: 'POST',
-    body: JSON.stringify({ slug }),
+    body: JSON.stringify({ slug, source }),
   })
 }
 
@@ -818,6 +960,21 @@ export interface SettingsDTO {
     id?: string
   }
   customModels: CustomModelDTO[]
+  defaultRegistrySource?: RegistrySelectableSource
+  registrySources: {
+    clawhub: {
+      enabled: boolean
+      apiBaseUrl: string
+      downloadUrl: string
+      token: string
+    }
+    tencent: {
+      enabled: boolean
+      indexUrl: string
+      searchUrl: string
+      downloadUrl: string
+    }
+  }
   builtinModelId?: string | null
 }
 

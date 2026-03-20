@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/stores/app'
 import {
   AlertTriangle,
   Check,
@@ -119,21 +120,31 @@ export function SkillListItem({
 
 export function EnvConfigRow({ envName, configured, onSaved }: { envName: string; configured: boolean; onSaved: () => void }) {
   const { t } = useI18n()
+  const showGlobalBubble = useAppStore((state) => state.showGlobalBubble)
   const [editing, setEditing] = useState(!configured)
   const [value, setValue] = useState('')
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'saving'>('idle')
+
+  const formatMessage = (template: string) => template.replace('{key}', envName)
 
   const handleSave = async () => {
     if (!value.trim()) return
     setStatus('saving')
     try {
       await configureSkillEnv(envName, value.trim())
-      setStatus('saved')
+      setStatus('idle')
       setEditing(false)
       setValue('')
       onSaved()
-    } catch {
-      setStatus('error')
+      showGlobalBubble({ message: formatMessage(t.skills.envSaveSuccess) })
+    } catch (error) {
+      setStatus('idle')
+      showGlobalBubble({
+        type: 'error',
+        message: error instanceof Error && error.message
+          ? error.message
+          : formatMessage(t.skills.envSaveFailed),
+      })
     }
   }
 
@@ -195,9 +206,9 @@ export function EnvConfigRow({ envName, configured, onSaved }: { envName: string
 
 export function InstallButton({ method, command, skillName, onInstalled }: { method: string; command: string; skillName: string; onInstalled: () => void }) {
   const { t } = useI18n()
+  const showGlobalBubble = useAppStore((state) => state.showGlobalBubble)
   const [copied, setCopied] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'installing' | 'success' | 'error'>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [status, setStatus] = useState<'idle' | 'installing'>('idle')
 
   const handleCopy = () => {
     navigator.clipboard.writeText(command).then(() => {
@@ -208,19 +219,25 @@ export function InstallButton({ method, command, skillName, onInstalled }: { met
 
   const handleInstall = async () => {
     setStatus('installing')
-    setErrorMsg('')
     try {
       const result = await installSkill(skillName, method)
       if (result.ok) {
-        setStatus('success')
+        setStatus('idle')
         onInstalled()
+        showGlobalBubble({ message: t.skills.installSuccess })
       } else {
-        setStatus('error')
-        setErrorMsg(result.stderr || `${t.skills.exitCodeLabel}: ${result.exitCode}`)
+        setStatus('idle')
+        showGlobalBubble({
+          type: 'error',
+          message: result.stderr || `${t.skills.exitCodeLabel}: ${result.exitCode}`,
+        })
       }
-    } catch {
-      setStatus('error')
-      setErrorMsg(t.skills.requestFailed)
+    } catch (error) {
+      setStatus('idle')
+      showGlobalBubble({
+        type: 'error',
+        message: error instanceof Error && error.message ? error.message : t.skills.installFailed,
+      })
     }
   }
 
@@ -248,18 +265,6 @@ export function InstallButton({ method, command, skillName, onInstalled }: { met
           {status === 'installing' ? t.skills.installing : t.skills.installFromMarket}
         </Button>
       </div>
-      {status === 'success' && (
-        <div className="text-xs text-green-400 flex items-center gap-1.5">
-          <CheckCircle className="h-3.5 w-3.5" />
-          {t.skills.installSuccess}
-        </div>
-      )}
-      {status === 'error' && errorMsg && (
-        <div className="text-xs text-red-400 flex items-center gap-1.5">
-          <AlertTriangle className="h-3.5 w-3.5" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
     </div>
   )
 }

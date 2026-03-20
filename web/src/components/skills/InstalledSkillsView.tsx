@@ -1,27 +1,47 @@
-import type { RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import type { Skill } from '@/api/client'
+import { MarkdownAuthoringEditor } from '@/components/skills/MarkdownAuthoringEditor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { SidePanel } from '@/components/layout/SidePanel'
 import { useI18n } from '@/i18n'
 import { useDragRegion } from '@/hooks/useDragRegion'
 import { cn } from '@/lib/utils'
-import { AlertTriangle, CheckCircle, Cpu, Globe, Key, Plus, Puzzle, Terminal, Trash2, Wrench, XCircle } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle,
+  ChevronDown,
+  Cpu,
+  FolderGit2,
+  Globe,
+  Key,
+  Link,
+  Link2,
+  Plus,
+  Puzzle,
+  Terminal,
+  Trash2,
+  Wrench,
+  XCircle,
+} from 'lucide-react'
 import {
   EnvConfigRow,
   InfoRow,
   InstallButton,
   InstallSectionHeader,
-  PathValue,
   SectionTitle,
   SkillListItem,
 } from './shared'
 import type { InstalledSkillListItem } from './skills-view-types'
-import { getSkillSourceBadges } from './shared-utils'
 
 interface InstalledSkillsViewProps {
   listRef: RefObject<HTMLDivElement | null>
-  onListScroll: (scrollTop: number) => void
   builtinSkillItems: InstalledSkillListItem[]
   externalSkillItems: InstalledSkillListItem[]
   customSkillItems: InstalledSkillListItem[]
@@ -29,15 +49,16 @@ interface InstalledSkillsViewProps {
   setSelected: (value: string | null) => void
   selectedSkill?: Skill
   onCreateSkill: () => void
+  onImportSkill: (provider: 'raw-url' | 'github') => void
   onEditSkill: (skillName: string) => void
   onDeleteSkill: (skillName: string) => void
   onToggleSkill: (skillName: string, enabled: boolean) => Promise<void>
   onReloadSkills: () => void
+  workspaceContent?: ReactNode
 }
 
 export function InstalledSkillsView({
   listRef,
-  onListScroll,
   builtinSkillItems,
   externalSkillItems,
   customSkillItems,
@@ -45,10 +66,12 @@ export function InstalledSkillsView({
   setSelected,
   selectedSkill,
   onCreateSkill,
+  onImportSkill,
   onEditSkill,
   onDeleteSkill,
   onToggleSkill,
   onReloadSkills,
+  workspaceContent,
 }: InstalledSkillsViewProps) {
   const { t } = useI18n()
   const drag = useDragRegion()
@@ -58,15 +81,33 @@ export function InstalledSkillsView({
       <SidePanel>
         <div className="h-12 shrink-0 px-3 border-b border-border flex items-center justify-between gap-2" {...drag}>
           <h2 className="font-semibold text-sm">{t.skills.title}</h2>
-          <Button size="sm" variant="outline" onClick={onCreateSkill}>
-            <Plus className="h-4 w-4" />
-            {t.skills.newSkill}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Plus className="h-4 w-4" />
+                {t.skills.newSkill}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-56">
+              <DropdownMenuItem className="cursor-pointer" onClick={onCreateSkill}>
+                <Plus className="h-4 w-4" />
+                {t.skills.newSkill}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => onImportSkill('raw-url')}>
+                <Link2 className="h-4 w-4" />
+                {t.skills.importFromRawUrl}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => onImportSkill('github')}>
+                <FolderGit2 className="h-4 w-4" />
+                {t.skills.importFromGitHub}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div
           ref={listRef}
           className="flex-1 overflow-y-auto p-2"
-          onScroll={(event) => onListScroll(event.currentTarget.scrollTop)}
         >
           {externalSkillItems.length === 0 && customSkillItems.length === 0 && builtinSkillItems.length === 0 ? (
             <div className="text-center text-muted-foreground text-sm py-8">{t.skills.noSkills}</div>
@@ -88,7 +129,7 @@ export function InstalledSkillsView({
                 <div className="space-y-1">
                   <div className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">{t.skills.groupExternal}</div>
                   {externalSkillItems.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">{t.skills.noSkills}</div>
+                    <div className="px-3 py-2 text-sm text-muted-foreground">{t.skills.noExternalSkills}</div>
                   ) : (
                     externalSkillItems.map((item) => (
                       <SkillListItem key={`${item.kind}-${item.name}`} item={item} selected={selected} setSelected={setSelected} onEditSkill={onEditSkill} t={t} />
@@ -111,20 +152,24 @@ export function InstalledSkillsView({
         </div>
       </SidePanel>
 
-      <div className="flex-1 p-6 overflow-y-auto">
-        {selectedSkill ? (
-          <InstalledSkillDetail
-            skill={selectedSkill}
-            onDeleteSkill={onDeleteSkill}
-            onReloadSkills={onReloadSkills}
-            onToggleSkill={onToggleSkill}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center">
-              <Puzzle className="h-12 w-12 mx-auto mb-4 opacity-20" />
-              <p>{t.skills.selectSkill}</p>
-            </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {workspaceContent ?? (
+          <div className="h-full overflow-y-auto p-6">
+            {selectedSkill ? (
+              <InstalledSkillDetail
+                skill={selectedSkill}
+                onDeleteSkill={onDeleteSkill}
+                onReloadSkills={onReloadSkills}
+                onToggleSkill={onToggleSkill}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <Puzzle className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                  <p>{t.skills.selectSkill}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -155,14 +200,7 @@ function InstalledSkillDetail({
           <Puzzle className="h-6 w-6" />
         </div>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold">{skill.name}</h1>
-            {getSkillSourceBadges(skill, t).map((label) => (
-              <Badge key={label} variant={label === t.skills.workspace ? 'default' : 'secondary'}>
-                {label}
-              </Badge>
-            ))}
-          </div>
+          <h1 className="text-xl font-semibold">{skill.name}</h1>
           <p className="text-sm text-muted-foreground">{skill.frontmatter.description}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -228,7 +266,22 @@ function InstalledSkillDetail({
 
       <div className="grid gap-4">
         {skill.frontmatter.version && <InfoRow label={t.skills.version} value={skill.frontmatter.version} />}
-        <InfoRow label={t.skills.path} value={<PathValue value={skill.path} />} />
+        {skill.registryMeta?.sourceUrl && (
+          <InfoRow
+            label={t.skills.sourceUrlLabel}
+            value={(
+              <a
+                href={skill.registryMeta.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex max-w-full items-start gap-1.5 text-right text-xs text-primary hover:underline break-all"
+              >
+                <Link className="mt-0.5 h-3 w-3 shrink-0" />
+                <span>{skill.registryMeta.sourceUrl}</span>
+              </a>
+            )}
+          />
+        )}
         {skill.frontmatter.os && skill.frontmatter.os.length > 0 && (
           <InfoRow
             label={t.skills.os}
@@ -278,7 +331,16 @@ function InstalledSkillDetail({
       {skill.content && (
         <div className="space-y-2">
           <SectionTitle icon={<Cpu className="h-4 w-4" />}>{t.skills.content}</SectionTitle>
-          <pre className="rounded-md border border-border bg-muted/30 p-4 text-sm overflow-x-auto whitespace-pre-wrap font-mono">{skill.content}</pre>
+          <MarkdownAuthoringEditor
+            title={skill.name}
+            version={skill.frontmatter.version}
+            description={skill.frontmatter.description}
+            value={skill.content}
+            readOnly
+            defaultMode="preview"
+            hideHeader
+            bare
+          />
         </div>
       )}
     </div>

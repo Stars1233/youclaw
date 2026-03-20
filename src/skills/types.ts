@@ -1,5 +1,29 @@
 export type SkillPriority = 'critical' | 'normal' | 'low'
 
+export const SkillRuntimeSource = {
+  Builtin: 'builtin',
+  Workspace: 'workspace',
+  User: 'user',
+} as const
+
+export type SkillRuntimeSource = typeof SkillRuntimeSource[keyof typeof SkillRuntimeSource]
+
+export const RegistryMarketplaceSource = {
+  ClawHub: 'clawhub',
+  Tencent: 'tencent',
+} as const
+
+export type RegistryMarketplaceSource = typeof RegistryMarketplaceSource[keyof typeof RegistryMarketplaceSource]
+export const REGISTRY_MARKETPLACE_SOURCES = Object.values(RegistryMarketplaceSource)
+
+export const SkillImportProvider = {
+  RawUrl: 'raw-url',
+  GitHub: 'github',
+} as const
+
+export type SkillImportProvider = typeof SkillImportProvider[keyof typeof SkillImportProvider]
+export const SKILL_IMPORT_PROVIDERS = Object.values(SkillImportProvider)
+
 export interface SkillFrontmatter {
   name: string
   description: string
@@ -43,7 +67,7 @@ export interface EligibilityDetail {
 
 export interface Skill {
   name: string
-  source: 'builtin' | 'workspace' | 'user' // Source tier
+  source: SkillRuntimeSource // Source tier
   frontmatter: SkillFrontmatter
   content: string          // SKILL.md body (frontmatter stripped)
   path: string             // File path
@@ -63,14 +87,38 @@ export interface AgentSkillsView {
   eligible: Skill[]        // Skills that passed eligibility checks
 }
 
-/** Registry metadata (.registry.json) */
-export interface SkillRegistryMeta {
-  source: string
+interface SkillRegistryMetaBase {
   slug: string
   installedAt: string
   displayName?: string
   version?: string
 }
+
+export interface MarketplaceSkillRegistryMeta extends SkillRegistryMetaBase {
+  source: RegistryMarketplaceSource
+  homepageUrl?: string
+}
+
+export interface RawUrlSkillRegistryMeta extends SkillRegistryMetaBase {
+  source: typeof SkillImportProvider.RawUrl
+  provider: typeof SkillImportProvider.RawUrl
+  sourceUrl: string
+}
+
+export interface GitHubSkillRegistryMeta extends SkillRegistryMetaBase {
+  source: typeof SkillImportProvider.GitHub
+  provider: typeof SkillImportProvider.GitHub
+  sourceUrl: string
+  homepageUrl?: string
+  ref?: string
+  path?: string
+}
+
+/** Registry metadata (.registry.json) */
+export type SkillRegistryMeta =
+  | MarketplaceSkillRegistryMeta
+  | RawUrlSkillRegistryMeta
+  | GitHubSkillRegistryMeta
 
 export type SkillCatalogGroup = 'builtin' | 'user'
 export type UserSkillKind = 'external' | 'custom'
@@ -125,7 +173,7 @@ export interface SkillProject {
   rootDir: string
   entryFile: string
   path: string
-  source: Skill['source']
+  source: SkillRuntimeSource
   editable: boolean
   managed: boolean
   origin: SkillProjectOrigin

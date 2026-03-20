@@ -1,20 +1,25 @@
 import type { RefObject } from 'react'
-import type { MarketplacePage, MarketplaceSort } from '@/api/client'
+import type { MarketplaceSort, RegistrySelectableSource, RegistrySourceInfo } from '@/api/client'
 import { MarketplaceCard } from '@/components/MarketplaceCard'
 import { MarketplaceDisclaimer } from '@/components/MarketplaceDisclaimer'
+import { RegistrySourceSelect } from '@/components/RegistrySourceSelect'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Search, Sparkles, Store } from 'lucide-react'
+import { Loader2, Search, Store } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import type { MarketplaceResultsViewModel } from '@/lib/marketplace-view-model'
 
 interface MarketplaceViewProps {
-  marketplace: MarketplacePage
+  resultsViewModel: MarketplaceResultsViewModel
   marketplaceStatus: 'idle' | 'loading' | 'loading-more' | 'error'
   marketplaceError: string
   marketplaceAppendError: string
   marketplaceSort: MarketplaceSort
   setMarketplaceSort: (sort: MarketplaceSort) => void
+  registrySource: RegistrySelectableSource
+  registrySources: RegistrySourceInfo[]
+  onRegistrySourceChange: (source: RegistrySelectableSource) => void
   searchQuery: string
   handleSearchChange: (value: string) => void
   onChanged: () => void
@@ -25,12 +30,15 @@ interface MarketplaceViewProps {
 }
 
 export function MarketplaceView({
-  marketplace,
+  resultsViewModel,
   marketplaceStatus,
   marketplaceError,
   marketplaceAppendError,
   marketplaceSort,
   setMarketplaceSort,
+  registrySource,
+  registrySources,
+  onRegistrySourceChange,
   searchQuery,
   handleSearchChange,
   onChanged,
@@ -40,16 +48,14 @@ export function MarketplaceView({
   marketplaceLoadMoreRef,
 }: MarketplaceViewProps) {
   const { t } = useI18n()
-  const isSearching = searchQuery.trim().length > 0
-  const visibleMarketplaceItems = marketplace.items.filter((skill) => !skill.installed)
-  const hasMarketplaceItems = visibleMarketplaceItems.length > 0
-  const canLoadMore = isSearching && Boolean(marketplace.nextCursor)
+  const selectedSourceInfo = registrySources.find((source) => source.id === registrySource) ?? null
+  const supportedSorts = selectedSourceInfo?.capabilities.sorts ?? ['trending', 'updated', 'downloads', 'stars', 'installsCurrent', 'installsAllTime']
 
   return (
     <div ref={marketplaceScrollRef} className="flex-1 overflow-y-auto p-6">
       <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               data-testid="marketplace-search-input"
@@ -59,37 +65,40 @@ export function MarketplaceView({
               className="pl-9"
             />
           </div>
-          {isSearching && (
-            <>
+
+          <div className="flex w-full shrink-0 flex-col gap-3 sm:w-auto sm:flex-row lg:items-center">
+            <RegistrySourceSelect
+              sources={registrySources}
+              value={registrySource}
+              onValueChange={onRegistrySourceChange}
+              className="w-full sm:w-[128px]"
+            />
+
+            {resultsViewModel.isSearching && supportedSorts.length > 0 && (
               <select
                 data-testid="marketplace-sort-select"
                 value={marketplaceSort}
                 onChange={(e) => setMarketplaceSort(e.target.value as MarketplaceSort)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-[148px]"
               >
-                <option value="trending">{t.skills.marketplaceSortTrending}</option>
-                <option value="updated">{t.skills.marketplaceSortUpdated}</option>
-                <option value="downloads">{t.skills.marketplaceSortDownloads}</option>
-                <option value="stars">{t.skills.marketplaceSortStars}</option>
-                <option value="installsCurrent">{t.skills.marketplaceSortInstalls}</option>
-                <option value="installsAllTime">{t.skills.marketplaceSortInstallsAllTime}</option>
+                {supportedSorts.includes('trending') && <option value="trending">{t.skills.marketplaceSortTrending}</option>}
+                {supportedSorts.includes('updated') && <option value="updated">{t.skills.marketplaceSortUpdated}</option>}
+                {supportedSorts.includes('downloads') && <option value="downloads">{t.skills.marketplaceSortDownloads}</option>}
+                {supportedSorts.includes('stars') && <option value="stars">{t.skills.marketplaceSortStars}</option>}
+                {supportedSorts.includes('installsCurrent') && <option value="installsCurrent">{t.skills.marketplaceSortInstalls}</option>}
+                {supportedSorts.includes('installsAllTime') && <option value="installsAllTime">{t.skills.marketplaceSortInstallsAllTime}</option>}
               </select>
-              <Badge variant="outline" className="gap-1 shrink-0">
-                <Sparkles className="h-3 w-3" />
-                {marketplace.source === 'clawhub' ? t.skills.marketplaceSourceRemote : t.skills.marketplaceSourceFallback}
-              </Badge>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         <MarketplaceDisclaimer />
 
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-medium">
-            {isSearching ? t.skills.searchMarketplace : t.skills.recommended}
-          </h3>
-        </div>
+        {!resultsViewModel.isSearching && (
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium">{t.skills.recommended}</h3>
+          </div>
+        )}
 
         {marketplaceStatus === 'loading' && (
           <div className="flex items-center justify-center py-12">
@@ -104,22 +113,53 @@ export function MarketplaceView({
           </div>
         )}
 
-        {marketplaceStatus !== 'loading' && marketplaceStatus !== 'error' && !hasMarketplaceItems && !canLoadMore && (
+        {marketplaceStatus !== 'loading' && marketplaceStatus !== 'error' && !resultsViewModel.hasItems && !resultsViewModel.canLoadMore && (
           <div className="text-center text-muted-foreground text-sm py-12">
             <Store className="h-12 w-12 mx-auto mb-4 opacity-20" />
-            <p>{isSearching ? t.skills.noMarketplaceSkills : t.skills.noSkills}</p>
+            <p>{resultsViewModel.isSearching ? t.skills.noMarketplaceSkills : t.skills.noSkills}</p>
           </div>
         )}
 
-        {marketplaceStatus !== 'loading' && visibleMarketplaceItems.length > 0 && (
-          <div className="grid gap-3">
-            {visibleMarketplaceItems.map((skill) => (
-              <MarketplaceCard key={skill.slug} skill={skill} onChanged={onChanged} />
-            ))}
-          </div>
+        {marketplaceStatus !== 'loading' && resultsViewModel.hasItems && (
+          resultsViewModel.isSearching ? (
+            <div className="grid gap-3">
+              {resultsViewModel.flatItems.map((viewModel) => (
+                <MarketplaceCard
+                  key={viewModel.slug}
+                  viewModel={viewModel}
+                  onChanged={onChanged}
+                  registrySource={registrySource}
+                  hideCategoryBadge
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {resultsViewModel.groupedItems.map((group) => (
+                <section key={group.category} className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                      {group.label}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-3">
+                    {group.items.map((viewModel) => (
+                      <MarketplaceCard
+                        key={viewModel.slug}
+                        viewModel={viewModel}
+                        onChanged={onChanged}
+                        registrySource={registrySource}
+                        hideCategoryBadge
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )
         )}
 
-        {canLoadMore && (
+        {resultsViewModel.canLoadMore && (
           <div className="space-y-3">
             <div ref={marketplaceLoadMoreRef} className="h-1" aria-hidden="true" />
             {marketplaceStatus === 'loading-more' && (

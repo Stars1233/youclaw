@@ -1,6 +1,7 @@
 export { SkillsLoader } from './loader.ts'
 export { SkillsWatcher } from './watcher.ts'
 export { SkillsInstaller } from './installer.ts'
+export { ImportManager } from './import-manager.ts'
 export { RegistryManager } from './registry.ts'
 export { scanWorkspaceFiles, matchSkillGlobs } from './globs.ts'
 export { parseSkillInvocations } from './invoke.ts'

@@ -8,7 +8,7 @@ import { getShellEnv, resetShellEnvCache } from '../utils/shell-env.ts'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { getLogger } from '../logger/index.ts'
 import type { SkillsLoader } from '../skills/index.ts'
-import { SkillProjectService, SkillsInstaller, resolveManagedSkillCatalogInfo } from '../skills/index.ts'
+import { ImportManager, SkillProjectService, SkillsInstaller, resolveManagedSkillCatalogInfo } from '../skills/index.ts'
 import type { AgentManager } from '../agent/index.ts'
 import type {
   AgentSkillsView,
@@ -20,7 +20,7 @@ import type {
 import type { SkillProjectDetail } from '../skills/project-service.ts'
 
 const PROJECT_META_FILENAME = '.youclaw-skill.json'
-const CLAWHUB_SOURCE = 'clawhub'
+const MARKETPLACE_SOURCES = new Set(['clawhub', 'tencent'])
 
 const configureEnvSchema = z.object({
   key: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
@@ -36,13 +36,30 @@ const toggleSchema = z.object({
   enabled: z.boolean(),
 })
 
+const normalizedUrlField = z.preprocess(
+  (value) => typeof value === 'string' ? value.trim().replace(/^[-*+]\s+/, '') : value,
+  z.string().url(),
+)
+
 const installFromPathSchema = z.object({
   sourcePath: z.string().min(1),
   targetDir: z.string().optional(),
 })
 
 const installFromUrlSchema = z.object({
-  url: z.string().url(),
+  url: normalizedUrlField,
+  targetDir: z.string().optional(),
+})
+
+const rawUrlImportSchema = z.object({
+  url: normalizedUrlField,
+  targetDir: z.string().optional(),
+})
+
+const githubImportSchema = z.object({
+  repoUrl: normalizedUrlField,
+  path: z.string().optional(),
+  ref: z.string().optional(),
   targetDir: z.string().optional(),
 })
 
@@ -79,10 +96,6 @@ export type SerializedManagedSkill = SkillProject & SkillCatalogInfo
 export type SerializedSkillProjectDetail = Omit<SkillProjectDetail, 'project'> & { skill: SerializedManagedSkill }
 
 function readRuntimeSkillProjectMeta(skill: Skill): SkillProjectMeta | null {
-  if (skill.source !== 'user') {
-    return null
-  }
-
   const metaPath = resolve(skill.path, '..', PROJECT_META_FILENAME)
   if (!existsSync(metaPath)) {
     return null
@@ -96,17 +109,20 @@ function readRuntimeSkillProjectMeta(skill: Skill): SkillProjectMeta | null {
 }
 
 function resolveRuntimeSkillCatalogInfo(skill: Skill): SkillCatalogInfo {
-  if (skill.source !== 'user') {
+  const projectMeta = readRuntimeSkillProjectMeta(skill)
+  const treatAsUserSkill = skill.source === 'user'
+    || Boolean(projectMeta && projectMeta.origin !== 'builtin')
+
+  if (!treatAsUserSkill) {
     return {
       catalogGroup: 'builtin',
       sortTimestamp: undefined,
     }
   }
 
-  const projectMeta = readRuntimeSkillProjectMeta(skill)
-  const externalSource = skill.registryMeta?.source === CLAWHUB_SOURCE
+  const externalSource = skill.registryMeta?.source && MARKETPLACE_SOURCES.has(skill.registryMeta.source)
     ? 'marketplace'
-    : projectMeta?.origin === 'imported'
+    : skill.registryMeta?.source === 'raw-url' || skill.registryMeta?.source === 'github' || projectMeta?.origin === 'imported'
       ? 'imported'
       : 'manual'
 
@@ -153,10 +169,11 @@ export function serializeManagedSkillDetail(detail: SkillProjectDetail): Seriali
 export function createSkillsRoutes(
   skillsLoader: SkillsLoader,
   agentManager: AgentManager,
-  options?: { skillsDir?: string },
+  options?: { skillsDir?: string; installer?: SkillsInstaller; importManager?: ImportManager },
 ) {
   const skills = new Hono()
-  const installer = new SkillsInstaller()
+  const installer = options?.installer ?? new SkillsInstaller()
+  const importManager = options?.importManager ?? new ImportManager(installer)
   const skillAuthoringService = new SkillProjectService(skillsLoader, agentManager, options?.skillsDir)
 
   // GET /api/skills — all available skills
@@ -474,6 +491,74 @@ export function createSkillsRoutes(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       return c.json({ error: msg }, 500)
+    }
+  })
+
+  skills.get('/skills/import/providers', (c) => {
+    return c.json(importManager.listProviders())
+  })
+
+  skills.post('/skills/import/raw-url/probe', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = rawUrlImportSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid parameters', details: parsed.error.issues }, 400)
+    }
+
+    try {
+      return c.json(await importManager.probe('raw-url', parsed.data))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return c.json({ error: msg }, 400)
+    }
+  })
+
+  skills.post('/skills/import/raw-url', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = rawUrlImportSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid parameters', details: parsed.error.issues }, 400)
+    }
+
+    try {
+      await importManager.import('raw-url', parsed.data)
+      skillsLoader.refresh()
+      return c.json({ ok: true })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return c.json({ error: msg }, 400)
+    }
+  })
+
+  skills.post('/skills/import/github/probe', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = githubImportSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid parameters', details: parsed.error.issues }, 400)
+    }
+
+    try {
+      return c.json(await importManager.probe('github', parsed.data))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return c.json({ error: msg }, 400)
+    }
+  })
+
+  skills.post('/skills/import/github', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = githubImportSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid parameters', details: parsed.error.issues }, 400)
+    }
+
+    try {
+      await importManager.import('github', parsed.data)
+      skillsLoader.refresh()
+      return c.json({ ok: true })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return c.json({ error: msg }, 400)
     }
   })
 
