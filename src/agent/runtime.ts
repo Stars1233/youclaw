@@ -533,6 +533,39 @@ export class AgentRuntime {
     return { message: normalizedRaw, errorCode: ErrorCode.UNKNOWN }
   }
 
+  private appendAttachmentInstructions(
+    prompt: string,
+    attachments: Array<{ filename: string; mediaType: string; filePath: string }>,
+  ): string {
+    if (attachments.length === 0) {
+      return prompt
+    }
+
+    const parts: string[] = []
+    const imageFiles = attachments.filter((attachment) => attachment.mediaType.startsWith('image/'))
+    const otherFiles = attachments.filter((attachment) => !attachment.mediaType.startsWith('image/'))
+
+    if (imageFiles.length > 0) {
+      const list = imageFiles
+        .map((attachment) => `- ${attachment.filePath} (${attachment.mediaType}, ${attachment.filename})`)
+        .join('\n')
+      parts.push(`[Attached images]\n${list}\nImage files are attached at these local paths.`)
+    }
+
+    if (otherFiles.length > 0) {
+      const list = otherFiles
+        .map((attachment) => `- ${attachment.filePath} (${attachment.mediaType}, ${attachment.filename})`)
+        .join('\n')
+      parts.push(`[Attached files]\n${list}\nPlease read these files before answering.`)
+    }
+
+    if (parts.length === 0) {
+      return prompt
+    }
+
+    return `${prompt}\n\n${parts.join('\n\n')}`.trim()
+  }
+
   private emitProcessing(agentId: string, chatId: string, isProcessing: boolean): void {
     this.eventBus.emit({ type: 'processing', agentId, chatId, isProcessing })
   }
