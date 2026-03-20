@@ -45,6 +45,11 @@ export default function App() {
           if (match) {
             updateCachedBaseUrl(`http://localhost:${match[1]}`)
           }
+          // Re-hydrate if initial hydrate failed (e.g. backend wasn't ready yet)
+          const { modelReady, hydrate } = useAppStore.getState()
+          if (!modelReady) {
+            hydrate()
+          }
         } else if (event.payload.status === 'port-conflict') {
           setPortConflict(true)
         }

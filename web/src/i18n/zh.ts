@@ -339,6 +339,12 @@ export const zh: Translations = {
     portConflictAction: '修改端口',
     portWebHint: '已保存。请手动重启后端服务以生效。',
   },
+  startupError: {
+    title: '启动失败',
+    description: '后端服务无法启动，请重试或联系我们获取帮助。',
+    retrying: '重试中...',
+    contactHint: '仍然遇到问题？联系我们：',
+  },
   gitSetup: {
     title: '需要安装 Git',
     description: '需要安装 Git 才能继续使用。',

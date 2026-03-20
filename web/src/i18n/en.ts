@@ -337,6 +337,12 @@ export const en = {
     portConflictAction: 'Change Port',
     portWebHint: 'Saved. Please restart the backend service manually to apply.',
   },
+  startupError: {
+    title: 'Startup Failed',
+    description: 'The backend service failed to start. Please try again or contact us for help.',
+    retrying: 'Retrying...',
+    contactHint: 'Still having trouble? Reach out to us:',
+  },
   gitSetup: {
     title: 'Git is Required',
     description: 'Git is required. Please install it to continue.',
