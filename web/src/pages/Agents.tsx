@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { getAgents, getAgentDocs, updateAgentDoc, createAgent, deleteAgent, getAgentConfig, updateAgentConfig, getBrowserProfiles, getSkills, getMarketplaceSkills, getMarketplaceSkill, installRecommendedSkill } from '../api/client'
+import { getAgents, getAgentDocs, updateAgentDoc, createAgent, deleteAgent, getAgentConfig, updateAgentConfig, getSkills, getMarketplaceSkills, getMarketplaceSkill, installRecommendedSkill } from '../api/client'
 import type { BrowserProfileDTO, Skill, MarketplaceSkill, MarketplaceSkillDetail } from '../api/client'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -78,7 +78,11 @@ type ViewMode = 'detail' | 'create'
 export function Agents() {
   const { t } = useI18n()
   const navigate = useNavigate()
-  const { refreshAgents: refreshChatAgents } = useChatContext()
+  const {
+    refreshAgents: refreshChatAgents,
+    browserProfiles,
+    refreshBrowserProfiles,
+  } = useChatContext()
   const drag = useDragRegion()
   const [agents, setAgents] = useState<Agent[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -103,7 +107,6 @@ export function Agents() {
   const [subAgents, setSubAgents] = useState<SubAgentsMap>({})
 
   // Browser profile related state
-  const [browserProfiles, setBrowserProfiles] = useState<BrowserProfileDTO[]>([])
   const [agentBrowserProfile, setAgentBrowserProfile] = useState<string | undefined>(undefined)
 
   // Skills related state
@@ -116,7 +119,7 @@ export function Agents() {
 
   useEffect(() => {
     loadAgents()
-    getBrowserProfiles().then(setBrowserProfiles).catch(() => {})
+    refreshBrowserProfiles()
     getSkills().then(setAllSkills).catch(() => {})
 
     // Refresh skills list when skills are changed from other pages
@@ -125,7 +128,7 @@ export function Agents() {
     }
     window.addEventListener('skills-changed', handleSkillsChanged)
     return () => window.removeEventListener('skills-changed', handleSkillsChanged)
-  }, [loadAgents])
+  }, [loadAgents, refreshBrowserProfiles])
 
   // Load documents for the selected agent
   useEffect(() => {
@@ -236,7 +239,7 @@ export function Agents() {
     <div className="flex h-full">
       {/* Left side: Agent list */}
       <SidePanel>
-        <div className="h-12 shrink-0 px-3 border-b border-border flex items-center justify-between" {...drag}>
+        <div className="h-9 shrink-0 px-3 border-b border-border flex items-center justify-between" {...drag}>
           <h2 className="font-semibold text-sm">{t.agents.title}</h2>
           <button
             data-testid="agent-create-btn"
@@ -486,6 +489,10 @@ function AgentDetail({
 }) {
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(agent.name)
+  const effectiveAgentBrowserProfile = browserProfiles.some((profile) => profile.id === agentBrowserProfile)
+    ? agentBrowserProfile
+    : undefined
+
   return (
     <div className="p-6 max-w-3xl space-y-6">
       {/* Header */}
@@ -604,7 +611,7 @@ function AgentDetail({
           </h2>
           <div className="flex items-center gap-3">
             <Select
-              value={agentBrowserProfile ?? '__none__'}
+              value={effectiveAgentBrowserProfile ?? '__none__'}
               onValueChange={(v) => onSaveBrowserProfile(v === '__none__' ? undefined : v)}
             >
               <SelectTrigger data-testid="agent-browser-profile-select" className="w-[240px]">

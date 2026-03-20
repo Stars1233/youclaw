@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { getItem, setItem } from '@/lib/storage'
+import { getItem, removeItem, setItem } from '@/lib/storage'
 import { applyThemeToDOM, type Theme } from '@/hooks/useTheme'
 import {
   checkGit,
@@ -18,10 +18,11 @@ import {
   type RegistrySelectableSource,
   type RegistrySourceInfo,
 } from '@/api/client'
-import { isTauri } from '@/api/transport'
+import { isTauri, openExternal } from '@/api/transport'
 import type { Locale } from '@/i18n/context'
 import { resolvePreferredRegistrySource } from '@/lib/registry-source'
 
+export type CloseAction = '' | 'minimize' | 'quit'
 type GlobalBubbleType = 'success' | 'error'
 
 interface GlobalBubbleState {
@@ -31,12 +32,43 @@ interface GlobalBubbleState {
   durationMs: number
 }
 
+let authPollInterval: ReturnType<typeof setInterval> | null = null
+let authPollTimeout: ReturnType<typeof setTimeout> | null = null
+
+function clearAuthPolling() {
+  if (authPollInterval) {
+    clearInterval(authPollInterval)
+    authPollInterval = null
+  }
+  if (authPollTimeout) {
+    clearTimeout(authPollTimeout)
+    authPollTimeout = null
+  }
+}
+
+async function ensureWindowsDeepLinkRegistration(): Promise<void> {
+  if (!isTauri || !navigator.userAgent.includes('Windows')) return
+
+  try {
+    const { isRegistered, register } = await import('@tauri-apps/plugin-deep-link')
+    const registered = await isRegistered('youclaw')
+    if (!registered) {
+      await register('youclaw')
+    }
+  } catch (err) {
+    console.error('Failed to verify/register deep-link protocol:', err)
+  }
+}
+
 interface AppState {
   theme: Theme
   setTheme: (theme: Theme) => void
 
   locale: Locale
   setLocale: (locale: Locale) => void
+
+  closeAction: CloseAction
+  setCloseAction: (closeAction: CloseAction) => Promise<void>
 
   sidebarCollapsed: boolean
   toggleSidebar: () => void
@@ -83,28 +115,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTheme: (theme) => {
     set({ theme })
     applyThemeToDOM(theme)
-    setItem('theme', theme)
+    void setItem('theme', theme)
   },
 
   locale: 'en',
   setLocale: (locale) => {
     set({ locale })
-    setItem('locale', locale)
+    void setItem('locale', locale)
+  },
+
+  closeAction: '',
+  setCloseAction: async (closeAction) => {
+    set({ closeAction })
+    if (closeAction) {
+      await setItem('close_action', closeAction)
+      return
+    }
+    await removeItem('close_action')
   },
 
   sidebarCollapsed: false,
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed
     set({ sidebarCollapsed: next })
-    setItem('sidebar-collapsed', String(next))
+    void setItem('sidebar-collapsed', String(next))
   },
   collapseSidebar: () => {
     set({ sidebarCollapsed: true })
-    setItem('sidebar-collapsed', 'true')
+    void setItem('sidebar-collapsed', 'true')
   },
   expandSidebar: () => {
     set({ sidebarCollapsed: false })
-    setItem('sidebar-collapsed', 'false')
+    void setItem('sidebar-collapsed', 'false')
   },
 
   cloudEnabled: false,
@@ -169,11 +211,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ authLoading: true })
 
       const startPolling = () => {
-        const pollInterval = setInterval(async () => {
+        clearAuthPolling()
+        authPollInterval = setInterval(async () => {
           try {
             const { loggedIn } = await getAuthStatus()
             if (loggedIn) {
-              clearInterval(pollInterval)
+              clearAuthPolling()
               await get().fetchUser()
               await get().fetchCreditBalance()
               set({ authLoading: false })
@@ -182,21 +225,23 @@ export const useAppStore = create<AppState>((set, get) => ({
             // Continue polling
           }
         }, 2000)
-        setTimeout(() => {
-          clearInterval(pollInterval)
+        authPollTimeout = setTimeout(() => {
+          clearAuthPolling()
           set({ authLoading: false })
         }, 120000)
-        return pollInterval
       }
 
       if (isTauri) {
+        await ensureWindowsDeepLinkRegistration()
+        // New desktop builds opt into the Tauri deep-link callback explicitly.
+        // Older clients keep calling /api/auth/login without platform=tauri and continue
+        // using the legacy localhost callback flow, so we preserve backwards compatibility.
         const { loginUrl } = await getAuthLoginUrl('tauri')
-        const { openUrl } = await import('@tauri-apps/plugin-opener')
-        await openUrl(loginUrl)
+        await openExternal(loginUrl)
         startPolling()
       } else {
         const { loginUrl } = await getAuthLoginUrl()
-        window.open(loginUrl, '_blank')
+        await openExternal(loginUrl)
         startPolling()
       }
     } catch (err) {
@@ -206,12 +251,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   logout: async () => {
+    clearAuthPolling()
     try {
       await authLogout()
     } catch {
       // Always clear local UI state even if backend request fails
     }
-    set({ user: null, isLoggedIn: false, creditBalance: null })
+    set({ user: null, isLoggedIn: false, authLoading: false, creditBalance: null })
   },
 
   updateProfile: async (params) => {
@@ -234,11 +280,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       if (isTauri) {
         const { payUrl } = await getPayUrl('tauri')
-        const { openUrl } = await import('@tauri-apps/plugin-opener')
-        await openUrl(payUrl)
+        await openExternal(payUrl)
       } else {
         const { payUrl } = await getPayUrl()
-        window.open(payUrl, '_blank')
+        await openExternal(payUrl)
       }
 
       const oldBalance = get().creditBalance
@@ -276,9 +321,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   hydrate: async () => {
-    const [theme, locale, sidebar] = await Promise.all([
+    const [theme, locale, closeAction, sidebar] = await Promise.all([
       getItem('theme'),
       getItem('locale'),
+      getItem('close_action'),
       getItem('sidebar-collapsed'),
     ])
     const resolvedTheme = (theme as Theme) ?? 'system'
@@ -286,6 +332,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       theme: resolvedTheme,
       locale: resolvedLocale,
+      closeAction: closeAction === 'minimize' || closeAction === 'quit' ? closeAction : '',
       sidebarCollapsed: sidebar === 'true',
     })
     applyThemeToDOM(resolvedTheme)

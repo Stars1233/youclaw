@@ -362,7 +362,7 @@ export function Skills() {
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            <Store className="h-3.5 w-3.5" />
+            <Store className="h-3 w-3" />
             {t.skills.marketplace}
           </button>
         </div>
