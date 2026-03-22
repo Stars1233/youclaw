@@ -1,6 +1,7 @@
 import { getLogger } from '../logger/index.ts'
 import { getEnv } from '../config/env.ts'
 import { getAuthToken } from '../routes/auth.ts'
+import { getDatabase } from '../db/index.ts'
 import type { Channel, InboundMessage, OnInboundMessage } from './types.ts'
 
 export interface WechatOAChannelOpts {
@@ -18,11 +19,34 @@ export class WechatOAChannel implements Channel {
   private _connected = false
   private abortController: AbortController | null = null
   private offset = 0
+  private _offsetLoaded = false
   private pollPromise: Promise<void> | null = null
   private opts: WechatOAChannelOpts
 
   constructor(opts: WechatOAChannelOpts) {
     this.opts = opts
+  }
+
+  private get kvKey(): string {
+    return `wechat_oa_offset:${this.name}`
+  }
+
+  private loadOffset(): void {
+    const db = getDatabase()
+    const row = db.query('SELECT value FROM kv_state WHERE key = ?').get(this.kvKey) as { value: string } | null
+    if (row) {
+      this.offset = Number(row.value)
+      this._offsetLoaded = true
+      getLogger().info({ offset: this.offset }, 'WeChat OA restored offset from database')
+    }
+  }
+
+  private saveOffset(): void {
+    const db = getDatabase()
+    db.run(
+      'INSERT OR REPLACE INTO kv_state (key, value) VALUES (?, ?)',
+      [this.kvKey, String(this.offset)]
+    )
   }
 
   private getToken(): string {
@@ -35,6 +59,7 @@ export class WechatOAChannel implements Channel {
 
   async connect(): Promise<void> {
     const logger = getLogger()
+    this.loadOffset()
     const baseUrl = this.getBaseUrl()
     const token = this.getToken()
 
@@ -51,6 +76,34 @@ export class WechatOAChannel implements Channel {
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       throw new Error(`WeChat OA bridge connectivity check failed: ${res.status} ${text}`)
+    }
+    // Consume body to release connection
+    await res.text().catch(() => {})
+
+    // Bootstrap: on first connection (no saved offset), fetch the latest update_id
+    // so we skip historical messages and only process new ones going forward
+    if (!this._offsetLoaded) {
+      try {
+        const bootstrapRes = await fetch(`${baseUrl}/api/wechat/getUpdates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', rdxtoken: token },
+          body: JSON.stringify({ offset: -1, limit: 1, timeout: 0 }),
+        })
+        if (bootstrapRes.ok) {
+          const rawText = await bootstrapRes.text()
+          const safeJson = fixLargeChatIds(rawText)
+          const data = JSON.parse(safeJson) as GetUpdatesResponse
+          if (data.ok && data.result.length > 0) {
+            const maxUpdateId = Math.max(...data.result.map(u => u.update_id))
+            this.offset = maxUpdateId + 1
+          }
+        }
+      } catch (err) {
+        logger.warn({ err }, 'WeChat OA offset bootstrap failed, starting from 0')
+      }
+      this.saveOffset()
+      this._offsetLoaded = true
+      logger.info({ offset: this.offset }, 'WeChat OA bootstrapped offset (skipped historical)')
     }
 
     this._connected = true
@@ -165,6 +218,11 @@ export class WechatOAChannel implements Channel {
           if (update.update_id >= this.offset) {
             this.offset = update.update_id + 1
           }
+        }
+
+        // Persist offset so restarts don't replay old messages
+        if (data.result.length > 0) {
+          this.saveOffset()
         }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') {
