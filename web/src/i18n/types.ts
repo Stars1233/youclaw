@@ -1,8 +1,12 @@
 import type { en } from './en'
 
-// 将所有字面量字符串宽化为 string，保留结构
+// Widen all literal strings to string, preserving structure
 type DeepStringify<T> = {
-  readonly [K in keyof T]: T[K] extends string ? string : DeepStringify<T[K]>
+  readonly [K in keyof T]: T[K] extends string
+    ? string
+    : T[K] extends readonly string[]
+      ? readonly string[]
+      : DeepStringify<T[K]>
 }
 
 export type Translations = DeepStringify<typeof en>

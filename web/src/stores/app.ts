@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { getItem, removeItem, setItem } from '@/lib/storage'
 import { applyThemeToDOM, type Theme } from '@/hooks/useTheme'
 import {
-  checkGit,
+  checkEnv,
   authLogout,
   getAuthLoginUrl,
   getAuthStatus,
@@ -15,6 +15,7 @@ import {
   updateProfile as apiUpdateProfile,
   updateSettings,
   type AuthUser,
+  type DependencyStatus,
   type RegistrySelectableSource,
   type RegistrySourceInfo,
 } from '@/api/client'
@@ -80,6 +81,11 @@ interface AppState {
   gitAvailable: boolean
   gitChecked: boolean
   recheckGit: () => Promise<boolean>
+
+  envChecked: boolean
+  envDependencies: DependencyStatus[]
+  envReady: boolean
+  recheckEnv: () => Promise<boolean>
 
   modelReady: boolean
 
@@ -155,12 +161,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitChecked: false,
 
   recheckGit: async () => {
+    await get().recheckEnv()
+    return get().gitAvailable
+  },
+
+  envChecked: false,
+  envDependencies: [],
+  envReady: true, // default true to avoid blocking on first load
+
+  recheckEnv: async () => {
     try {
-      const { available } = await checkGit()
-      set({ gitAvailable: available, gitChecked: true })
-      return available
+      const result = await checkEnv()
+      const envReady = result.dependencies
+        .filter(d => d.required)
+        .every(d => d.available)
+      const gitDep = result.dependencies.find(d => d.name === 'git')
+      set({
+        envDependencies: result.dependencies,
+        envChecked: true,
+        envReady,
+        gitAvailable: gitDep?.available ?? true,
+        gitChecked: true,
+      })
+      return envReady
     } catch {
-      set({ gitAvailable: true, gitChecked: true })
+      // If env check fails, don't block the app
+      set({ envChecked: true, envReady: true, gitAvailable: true, gitChecked: true })
       return true
     }
   },
@@ -337,10 +363,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
     applyThemeToDOM(resolvedTheme)
 
-    const isWindows = navigator.userAgent.includes('Windows')
-    if (isWindows) {
-      await get().recheckGit()
-    }
+    await get().recheckEnv()
 
     try {
       const [cloudStatus, settings, registrySources] = await Promise.all([

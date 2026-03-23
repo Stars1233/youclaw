@@ -19,6 +19,25 @@ export async function checkGit() {
   return apiFetch<{ available: boolean; path: string | null }>('/api/git-check')
 }
 
+// Environment dependency status
+export interface DependencyStatus {
+  name: string
+  available: boolean
+  path: string | null
+  version: string | null
+  required: boolean
+}
+
+export interface EnvCheckResult {
+  platform: string
+  dependencies: DependencyStatus[]
+}
+
+// Check environment dependencies
+export async function checkEnv(): Promise<EnvCheckResult> {
+  return apiFetch<EnvCheckResult>('/api/env-check')
+}
+
 // Send message to agent
 export async function sendMessage(
   agentId: string,

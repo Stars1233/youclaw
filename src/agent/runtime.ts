@@ -1,9 +1,10 @@
 import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
-import { existsSync, copyFileSync, mkdirSync, statSync, chmodSync, writeFileSync } from 'node:fs'
+import { existsSync, copyFileSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { getEnv } from '../config/index.ts'
+import { which } from '../utils/shell-env.ts'
 import { getLogger } from '../logger/index.ts'
 import { getSession, saveSession } from '../db/index.ts'
 import type { EventBus } from '../events/index.ts'
@@ -184,77 +185,18 @@ function detectSystemProxy(): void {
 
 /**
  * Ensure Bun runtime is available for SDK subprocess.
- * In bundled mode, extracts embedded Bun from resources to DATA_DIR/bun-runtime/.
- * Returns the resolved path to the bun executable, or null if not needed / unavailable.
+ * Previously extracted embedded Bun from resources; now the sidecar is self-contained
+ * and we rely on system Bun instead. Returns null (no embedded Bun).
  */
 export function ensureBunRuntime(): string | null {
-  const isBundled = process.execPath.includes('.app/') || process.execPath.includes('youclaw-server')
-  if (!isBundled) return null  // Dev mode: use process.execPath directly
-
-  const dataDir = process.env.DATA_DIR
-  if (!dataDir) return null
-
-  const ext = process.platform === 'win32' ? '.exe' : ''
-  const targetDir = resolve(dataDir, 'bun-runtime')
-  const targetPath = resolve(targetDir, `bun${ext}`)
-
-  // Already extracted?
-  if (existsSync(targetPath)) {
-    _bunRuntimePath = targetPath
-    return targetPath
-  }
-
-  // Try to extract from resources
-  const resourcesDir = process.env.RESOURCES_DIR
-  if (resourcesDir) {
-    // Tauri 2 converts ../ to _up_/, so the bun-runtime dir could be at multiple locations
-    const candidates = [
-      resolve(resourcesDir, '_up_/src-tauri/resources/bun-runtime', `bun${ext}`),
-      resolve(resourcesDir, 'bun-runtime', `bun${ext}`),
-    ]
-    for (const src of candidates) {
-      if (existsSync(src)) {
-        try {
-          mkdirSync(targetDir, { recursive: true })
-          copyFileSync(src, targetPath)
-          chmodSync(targetPath, 0o755)
-          // macOS: strip quarantine
-          if (process.platform === 'darwin') {
-            try { execSync(`xattr -d com.apple.quarantine "${targetPath}"`, { timeout: 5000 }) } catch {}
-          }
-          safeLog('info', 'Extracted embedded Bun runtime', { src, dst: targetPath })
-          _bunRuntimePath = targetPath
-          return targetPath
-        } catch (err) {
-          safeLog('warn', 'Failed to extract embedded Bun runtime candidate', {
-            src,
-            dst: targetPath,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
-      }
-    }
-  }
-
-  // No embedded runtime found
-  safeLog('warn', 'No embedded Bun runtime in resources')
   return null
 }
 
-// Module-level cache set by ensureBunRuntime() or lazy init
-let _bunRuntimePath: string | null | undefined = undefined
-
 /**
  * Return the directory containing the embedded Bun binary, or null if unavailable.
- * Used by shell-env.ts to add embedded Bun to PATH as a fallback.
+ * No longer ships embedded Bun — always returns null.
  */
 export function getBunRuntimeDir(): string | null {
-  if (_bunRuntimePath) return dirname(_bunRuntimePath)
-  const dataDir = process.env.DATA_DIR
-  if (!dataDir) return null
-  const ext = process.platform === 'win32' ? '.exe' : ''
-  const targetDir = resolve(dataDir, 'bun-runtime')
-  if (existsSync(resolve(targetDir, `bun${ext}`))) return targetDir
   return null
 }
 
@@ -312,25 +254,24 @@ function resolveRuntimeExecutable(): string {
   const isBundled = process.execPath.includes('.app/') || process.execPath.includes('youclaw-server')
   if (!isBundled) return process.execPath
 
-  // Prefer embedded Bun on all platforms (bundled with the app, no version mismatch issues)
-  if (_bunRuntimePath === undefined) {
-    _bunRuntimePath = ensureBunRuntime()
-  }
-  if (_bunRuntimePath && existsSync(_bunRuntimePath)) {
-    return _bunRuntimePath
+  // Try system Bun first
+  const bunPath = which('bun')
+  if (bunPath) {
+    safeLog('info', 'Using system Bun for SDK subprocess', { bunPath })
+    return bunPath
   }
 
-  // Windows fallback: try system Node.js (>=18) if embedded Bun is unavailable
+  // Windows fallback: try system Node.js (>=18)
   if (process.platform === 'win32') {
     const nodePath = findNodeExecutable()
     if (nodePath) {
-      safeLog('info', 'Embedded Bun unavailable, using Node.js for SDK subprocess on Windows', { nodePath })
+      safeLog('info', 'Bun unavailable, using Node.js for SDK subprocess on Windows', { nodePath })
       return nodePath
     }
-    safeLog('warn', 'Neither embedded Bun nor Node.js (>=18) found on Windows')
+    safeLog('warn', 'Neither Bun nor Node.js (>=18) found on Windows')
   }
 
-  // Fallback: system bun
+  // Last resort: hope 'bun' is on PATH at execution time
   return 'bun'
 }
 

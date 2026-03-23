@@ -8,7 +8,7 @@ import { Tasks } from './pages/Tasks'
 import { Logs } from './pages/Logs'
 import { Skills } from './pages/Skills'
 import { Login } from './pages/Login'
-import { GitSetup } from './pages/GitSetup'
+import { EnvSetup } from './pages/EnvSetup'
 import { PortConflictDialog } from './components/PortConflictDialog'
 import { GlobalBubble } from './components/GlobalBubble'
 import { CloseConfirmDialog } from './components/CloseConfirmDialog'
@@ -30,7 +30,9 @@ export default function App() {
   useTheme()
   const isLoggedIn = useAppStore((s) => s.isLoggedIn)
   const cloudEnabled = useAppStore((s) => s.cloudEnabled)
-  const gitAvailable = useAppStore((s) => s.gitAvailable)
+  const envReady = useAppStore((s) => s.envReady)
+  const envChecked = useAppStore((s) => s.envChecked)
+  const envDependencies = useAppStore((s) => s.envDependencies)
   const fetchUser = useAppStore((s) => s.fetchUser)
   const fetchCreditBalance = useAppStore((s) => s.fetchCreditBalance)
   const canPass = !cloudEnabled || isLoggedIn
@@ -214,9 +216,9 @@ export default function App() {
     }
   }, [fetchCreditBalance, fetchUser])
 
-  // Block all pages until Git is available (Windows only)
-  if (!gitAvailable) {
-    return <GitSetup />
+  // Block all pages until required environment dependencies are available
+  if (envChecked && !envReady) {
+    return <EnvSetup dependencies={envDependencies} />
   }
 
   return (

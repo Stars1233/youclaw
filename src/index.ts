@@ -9,8 +9,6 @@ import { initLogger, getLogger } from './logger/index.ts'
 import { initDatabase, createTask, updateTask, deleteTask, getTasks, getTask } from './db/index.ts'
 import { EventBus } from './events/index.ts'
 import { AgentManager, AgentQueue, PromptBuilder, AgentCompiler, AgentRouter, HooksManager, SecretsManager } from './agent/index.ts'
-import { ensureBunRuntime } from './agent/runtime.ts'
-import { resetShellEnvCache } from './utils/shell-env.ts'
 import { MessageRouter, ChannelManager } from './channel/index.ts'
 import { SkillsLoader, SkillsWatcher, RegistryManager } from './skills/index.ts'
 import { MemoryManager, MemoryIndexer } from './memory/index.ts'
@@ -32,19 +30,6 @@ async function main() {
   // 2. Initialize logger
   const logger = initLogger()
   logger.info('YouClaw starting...')
-
-  // 2b. Pre-extract embedded Bun runtime (before any agent code runs)
-  try {
-    const bunRuntimePath = ensureBunRuntime()
-    if (bunRuntimePath) {
-      logger.info({ path: bunRuntimePath }, 'Bun runtime ready (embedded)')
-      resetShellEnvCache()  // Ensure embedded Bun dir is picked up by getShellEnv()
-    } else {
-      logger.info('Using system Bun runtime')
-    }
-  } catch (err) {
-    logger.warn({ err }, '[STARTUP] Step 2b failed: ensure Bun runtime, continuing without embedded runtime')
-  }
 
   // 3. Initialize database
   try {
