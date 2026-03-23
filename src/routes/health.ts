@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, chmodSync, writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 import { z } from 'zod/v4'
 import { which, resetShellEnvCache, getShellEnv } from '../utils/shell-env.ts'
 
@@ -163,11 +164,10 @@ health.get('/env-check', (c) => {
     required: true,
   })
 
-  // 3. Node.js (required only on Windows; on Windows also check version >= 18)
+  // 3. Node.js (optional — fallback runtime on Windows if Bun compat is insufficient)
   const node = checkTool(['node'])
   let nodeAvailable = node.path !== null
   if (isWindows && nodeAvailable && node.version) {
-    // On Windows, Node.js must be >= 18 to be considered available
     if (!isNodeVersionSufficient(node.version)) {
       nodeAvailable = false
     }
@@ -177,7 +177,7 @@ health.get('/env-check', (c) => {
     available: nodeAvailable,
     path: node.path,
     version: node.version,
-    required: isWindows,
+    required: false,
   })
 
   // 4. Python (optional, all platforms)
@@ -209,6 +209,117 @@ const installToolSchema = z.object({
   tool: z.enum(['bun', 'git', 'node']),
 })
 
+const BUN_CDN_BASE = 'https://cdn.chat2db-ai.com/youclaw/tools/bun'
+const BUN_GITHUB_BASE = 'https://github.com/oven-sh/bun/releases/download/bun-v1.2.15'
+
+/**
+ * Get the Bun zip filename for the current platform.
+ */
+function getBunZipTarget(): string | null {
+  const arch = process.arch // 'arm64' | 'x64'
+  if (process.platform === 'darwin') {
+    return arch === 'arm64' ? 'bun-darwin-aarch64.zip' : 'bun-darwin-x64.zip'
+  }
+  if (process.platform === 'win32') {
+    return 'bun-windows-x64.zip'
+  }
+  if (process.platform === 'linux') {
+    return arch === 'arm64' ? 'bun-linux-aarch64.zip' : 'bun-linux-x64.zip'
+  }
+  return null
+}
+
+/**
+ * Download Bun from CDN (with GitHub fallback), extract to ~/.bun/bin/.
+ * Pure JS implementation using Bun built-in fetch + unzip.
+ */
+async function installBun(): Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number }> {
+  const zipName = getBunZipTarget()
+  if (!zipName) {
+    return { ok: false, stdout: '', stderr: `Unsupported platform: ${process.platform} ${process.arch}`, exitCode: 1 }
+  }
+
+  const cdnUrl = `${BUN_CDN_BASE}/${zipName}`
+  const githubUrl = `${BUN_GITHUB_BASE}/${zipName}`
+
+  // Download zip: try CDN first, fallback to GitHub
+  let zipBuffer: ArrayBuffer | null = null
+  let downloadSource = ''
+  for (const url of [cdnUrl, githubUrl]) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(120_000) })
+      if (resp.ok) {
+        zipBuffer = await resp.arrayBuffer()
+        downloadSource = url
+        break
+      }
+    } catch {
+      // Try next source
+    }
+  }
+
+  if (!zipBuffer) {
+    return { ok: false, stdout: '', stderr: `Failed to download Bun from CDN and GitHub`, exitCode: 1 }
+  }
+
+  // Determine install directory
+  const home = process.env.HOME || process.env.USERPROFILE || ''
+  const ext = process.platform === 'win32' ? '.exe' : ''
+  const bunDir = resolve(home, '.bun', 'bin')
+  const bunPath = resolve(bunDir, `bun${ext}`)
+
+  try {
+    mkdirSync(bunDir, { recursive: true })
+
+    // Write zip to temp file and extract
+    const tmpZip = resolve(tmpdir(), `bun-install-${Date.now()}.zip`)
+    writeFileSync(tmpZip, Buffer.from(zipBuffer))
+
+    // Extract: the zip contains a folder like bun-darwin-aarch64/bun
+    const folderName = zipName.replace('.zip', '')
+    if (process.platform === 'win32') {
+      execSync(
+        `powershell -Command "Expand-Archive -Force '${tmpZip}' '${tmpdir()}'"`,
+        { timeout: 30_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+      )
+    } else {
+      execSync(`unzip -o "${tmpZip}" -d "${tmpdir()}"`, {
+        timeout: 30_000, stdio: ['pipe', 'pipe', 'pipe'],
+      })
+    }
+
+    // Copy binary to ~/.bun/bin/
+    const extractedBun = resolve(tmpdir(), folderName, `bun${ext}`)
+    if (!existsSync(extractedBun)) {
+      return { ok: false, stdout: '', stderr: `Extracted binary not found at ${extractedBun}`, exitCode: 1 }
+    }
+
+    const { copyFileSync } = await import('node:fs')
+    copyFileSync(extractedBun, bunPath)
+    if (process.platform !== 'win32') {
+      chmodSync(bunPath, 0o755)
+    }
+
+    // Clean up temp files
+    try {
+      const { rmSync } = await import('node:fs')
+      rmSync(tmpZip, { force: true })
+      rmSync(resolve(tmpdir(), folderName), { recursive: true, force: true })
+    } catch { /* ignore cleanup errors */ }
+
+    resetShellEnvCache()
+
+    return {
+      ok: true,
+      stdout: `Bun installed to ${bunPath} (from ${downloadSource})`,
+      stderr: '',
+      exitCode: 0,
+    }
+  } catch (err: any) {
+    return { ok: false, stdout: '', stderr: err.message ?? String(err), exitCode: 1 }
+  }
+}
+
 health.post('/install-tool', async (c) => {
   const body = await c.req.json()
   const parsed = installToolSchema.safeParse(body)
@@ -220,14 +331,15 @@ health.post('/install-tool', async (c) => {
   const isWindows = process.platform === 'win32'
   const isMac = process.platform === 'darwin'
 
-  // Determine install command based on platform and tool
+  // Bun: download from CDN and extract (no shell script dependency)
+  if (tool === 'bun') {
+    const result = await installBun()
+    return c.json(result)
+  }
+
+  // Git / Node.js: use platform commands
   let command: string | null = null
   switch (tool) {
-    case 'bun':
-      command = isWindows
-        ? 'powershell -ExecutionPolicy Bypass -c "irm bun.sh/install.ps1 | iex"'
-        : 'bash -c "curl -fsSL https://bun.sh/install | bash"'
-      break
     case 'git':
       if (isMac) {
         command = 'xcode-select --install'
@@ -253,7 +365,7 @@ health.post('/install-tool', async (c) => {
   try {
     stdout = execSync(command, {
       encoding: 'utf-8',
-      timeout: 300_000, // 5 minutes for downloads
+      timeout: 300_000,
       windowsHide: true,
       env: getShellEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -264,7 +376,7 @@ health.post('/install-tool', async (c) => {
     exitCode = err.status ?? 1
     // xcode-select --install returns non-zero if CLT is already installed or dialog is shown
     if (tool === 'git' && isMac) {
-      exitCode = 0 // Not a real error - dialog was triggered
+      exitCode = 0
     }
   }
 
