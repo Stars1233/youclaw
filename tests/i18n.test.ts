@@ -82,6 +82,21 @@ describe('i18n — newly added tasks keys exist', () => {
     'selectTask',
     'schedule',
     'nextRun',
+    'cronDaily',
+    'cronWeekly',
+    'cronMonthly',
+    'cronCustom',
+    'weekday',
+    'dayOfMonth',
+    'cronPreview',
+    'cronCustomHelp',
+    'weekdayMonday',
+    'weekdayTuesday',
+    'weekdayWednesday',
+    'weekdayThursday',
+    'weekdayFriday',
+    'weekdaySaturday',
+    'weekdaySunday',
   ]
 
   for (const key of requiredTaskKeys) {

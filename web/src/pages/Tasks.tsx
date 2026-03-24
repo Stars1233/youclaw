@@ -11,6 +11,7 @@ import {
 } from '../api/client'
 import type { ScheduledTaskDTO, TaskRunLogDTO } from '../api/client'
 import { cn } from '../lib/utils'
+import { buildCronExpression, createDefaultCronDraft, parseCronExpression, type CronDraft, type CronMode } from '../lib/task-cron'
 import { useI18n } from '../i18n'
 import { SidePanel } from '@/components/layout/SidePanel'
 import { useDragRegion } from "@/hooks/useDragRegion"
@@ -125,6 +126,7 @@ function shiftMonth(date: Date, offset: number): Date {
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => pad2(hour))
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, minute) => pad2(minute))
+const DAY_OF_MONTH_OPTIONS = Array.from({ length: 31 }, (_, day) => String(day + 1))
 const WHEEL_ITEM_HEIGHT = 40
 const WHEEL_VISIBLE_ROWS = 5
 
@@ -143,6 +145,35 @@ function StatusBadge({ status }: { status: string }) {
 
 type PanelMode = 'view' | 'create' | 'edit'
 type OnceMode = 'in5m' | 'in30m' | 'in1h' | 'tomorrow9' | 'custom' | null
+
+function createInitialCronState(task?: ScheduledTaskDTO): {
+  mode: CronMode
+  draft: CronDraft
+  customValue: string
+} {
+  if (task?.schedule_type !== 'cron') {
+    return {
+      mode: 'daily',
+      draft: createDefaultCronDraft(),
+      customValue: '',
+    }
+  }
+
+  const parsed = parseCronExpression(task.schedule_value)
+  if (parsed) {
+    return {
+      mode: parsed.mode,
+      draft: parsed.draft,
+      customValue: task.schedule_value,
+    }
+  }
+
+  return {
+    mode: 'custom',
+    draft: createDefaultCronDraft(),
+    customValue: task.schedule_value,
+  }
+}
 
 function createRelativeOnceDate(minutesFromNow: number): Date {
   const next = new Date()
@@ -225,7 +256,9 @@ export function Tasks() {
       loadTasks()
       setSelectedId(cloned.id)
       setPanelMode('view')
-    } catch {}
+    } catch {
+      return
+    }
   }
 
   const agentName = (agentId: string) => {
@@ -635,14 +668,6 @@ function OnceDateTimePicker({
   const [hour, setHour] = useState(() => pad2(initialValue.getHours()))
   const [minute, setMinute] = useState(() => pad2(initialValue.getMinutes()))
 
-  useEffect(() => {
-    const next = parseDatetimeLocal(value) ?? createDefaultOnceDate()
-    setSelectedDate(next)
-    setVisibleMonth(startOfMonth(next))
-    setHour(pad2(next.getHours()))
-    setMinute(pad2(next.getMinutes()))
-  }, [value])
-
   const commit = (date: Date, nextHour: string, nextMinute: string) => {
     const next = new Date(date)
     next.setHours(Number(nextHour), Number(nextMinute), 0, 0)
@@ -769,6 +794,176 @@ function OnceDateTimePicker({
   )
 }
 
+function CronFieldSelect({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  testId,
+}: {
+  label: string
+  value: string
+  options: Array<{ value: string; label: string }>
+  onChange: (value: string) => void
+  disabled?: boolean
+  testId: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs text-muted-foreground">{label}</label>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger data-testid={testId} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              data-testid={`${testId}-option-${option.value}`}
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+function CronPresetBuilder({
+  mode,
+  draft,
+  customValue,
+  onModeChange,
+  onDraftChange,
+  onCustomValueChange,
+  disabled,
+}: {
+  mode: CronMode
+  draft: CronDraft
+  customValue: string
+  onModeChange: (mode: CronMode) => void
+  onDraftChange: (patch: Partial<CronDraft>) => void
+  onCustomValueChange: (value: string) => void
+  disabled?: boolean
+}) {
+  const { t } = useI18n()
+
+  const weekdayOptions = [
+    { value: '1', label: t.tasks.weekdayMonday },
+    { value: '2', label: t.tasks.weekdayTuesday },
+    { value: '3', label: t.tasks.weekdayWednesday },
+    { value: '4', label: t.tasks.weekdayThursday },
+    { value: '5', label: t.tasks.weekdayFriday },
+    { value: '6', label: t.tasks.weekdaySaturday },
+    { value: '0', label: t.tasks.weekdaySunday },
+  ]
+
+  const cronPreview = buildCronExpression(mode === 'custom' ? 'daily' : mode, draft)
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {([
+          { mode: 'daily', label: t.tasks.cronDaily },
+          { mode: 'weekly', label: t.tasks.cronWeekly },
+          { mode: 'monthly', label: t.tasks.cronMonthly },
+          { mode: 'custom', label: t.tasks.cronCustom },
+        ] as const).map((option) => (
+          <button
+            key={option.mode}
+            type="button"
+            data-testid={`task-cron-mode-${option.mode}`}
+            onClick={() => onModeChange(option.mode)}
+            disabled={disabled}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-xs transition-colors',
+              mode === option.mode
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-accent/20 text-muted-foreground hover:text-foreground',
+              disabled && 'cursor-not-allowed opacity-50'
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'custom' ? (
+        <div className="space-y-2">
+          <Input
+            data-testid="task-input-schedule"
+            type="text"
+            value={customValue}
+            onChange={(e) => onCustomValueChange(e.target.value)}
+            placeholder={t.tasks.cronPlaceholder}
+            disabled={disabled}
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">{t.tasks.cronCustomHelp}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className={cn('grid gap-3', mode === 'daily' ? 'sm:grid-cols-2' : 'sm:grid-cols-3')}>
+            {mode === 'weekly' && (
+              <CronFieldSelect
+                label={t.tasks.weekday}
+                value={draft.weekday}
+                options={weekdayOptions}
+                onChange={(weekday) => onDraftChange({ weekday })}
+                disabled={disabled}
+                testId="task-cron-weekday"
+              />
+            )}
+
+            {mode === 'monthly' && (
+              <CronFieldSelect
+                label={t.tasks.dayOfMonth}
+                value={draft.dayOfMonth}
+                options={DAY_OF_MONTH_OPTIONS.map((day) => ({ value: day, label: day }))}
+                onChange={(dayOfMonth) => onDraftChange({ dayOfMonth })}
+                disabled={disabled}
+                testId="task-cron-day"
+              />
+            )}
+
+            <CronFieldSelect
+              label={t.tasks.hour}
+              value={draft.hour}
+              options={HOUR_OPTIONS.map((hour) => ({ value: hour, label: hour }))}
+              onChange={(hour) => onDraftChange({ hour })}
+              disabled={disabled}
+              testId="task-cron-hour"
+            />
+
+            <CronFieldSelect
+              label={t.tasks.minute}
+              value={draft.minute}
+              options={MINUTE_OPTIONS.map((minute) => ({ value: minute, label: minute }))}
+              onChange={(minute) => onDraftChange({ minute })}
+              disabled={disabled}
+              testId="task-cron-minute"
+            />
+          </div>
+
+          <div className="rounded-md border border-dashed border-border bg-accent/10 px-3 py-2">
+            <div className="text-[11px] text-muted-foreground">{t.tasks.cronPreview}</div>
+            <div data-testid="task-cron-preview" className="mt-1 font-mono text-sm">
+              {cronPreview}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode !== 'custom' && (
+        <p className="text-xs text-muted-foreground">{t.tasks.cronHelp}</p>
+      )}
+    </div>
+  )
+}
+
 // ===== Task form (shared for create + edit) =====
 
 function TaskForm({
@@ -784,26 +979,41 @@ function TaskForm({
 }) {
   const { t } = useI18n()
   const isEdit = !!task
+  const initialCronState = createInitialCronState(task)
+  const initialScheduleType: 'cron' | 'interval' | 'once' =
+    task?.schedule_type === 'cron' || task?.schedule_type === 'once'
+      ? task.schedule_type
+      : 'interval'
 
   const [name, setName] = useState(task?.name ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [agentId, setAgentId] = useState(task?.agent_id ?? agents[0]?.id ?? '')
   const [prompt, setPrompt] = useState(task?.prompt ?? '')
-  const [scheduleType, setScheduleType] = useState<'cron' | 'interval' | 'once'>(
-    (task?.schedule_type as any) ?? 'interval'
-  )
+  const [scheduleType, setScheduleType] = useState<'cron' | 'interval' | 'once'>(initialScheduleType)
   const [scheduleValue, setScheduleValue] = useState(() => {
     if (!task) return ''
     if (task.schedule_type === 'interval') return msToMinutes(task.schedule_value)
     if (task.schedule_type === 'once') return isoToDatetimeLocal(task.schedule_value)
-    return task.schedule_value
+    return ''
   })
+  const [cronMode, setCronMode] = useState<CronMode>(initialCronState.mode)
+  const [cronDraft, setCronDraft] = useState<CronDraft>(initialCronState.draft)
+  const [cronCustomValue, setCronCustomValue] = useState(initialCronState.customValue)
   const [onceMode, setOnceMode] = useState<OnceMode>(() =>
     task?.schedule_type === 'once' ? 'custom' : null
   )
   const [oncePickerOpen, setOncePickerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const cronScheduleValue = cronMode === 'custom'
+    ? cronCustomValue.trim()
+    : buildCronExpression(cronMode, cronDraft)
+
+  useEffect(() => {
+    if (!isEdit && !agentId && agents[0]?.id) {
+      setAgentId(agents[0].id)
+    }
+  }, [agentId, agents, isEdit])
 
   const applyOncePreset = (mode: Exclude<OnceMode, 'custom' | null>) => {
     const next =
@@ -828,9 +1038,18 @@ function TaskForm({
     setOncePickerOpen(true)
   }
 
+  const handleCronModeChange = (mode: CronMode) => {
+    if (mode === 'custom') {
+      setCronCustomValue((current) => current || buildCronExpression(cronMode === 'custom' ? 'daily' : cronMode, cronDraft))
+    }
+    setCronMode(mode)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agentId || !prompt || !scheduleValue) {
+    const rawScheduleValue = scheduleType === 'cron' ? cronScheduleValue : scheduleValue
+
+    if (!agentId || !prompt || !rawScheduleValue) {
       setError(t.tasks.allRequired)
       return
     }
@@ -839,7 +1058,7 @@ function TaskForm({
     setError('')
 
     try {
-      let finalValue = scheduleValue
+      let finalValue = rawScheduleValue
       if (scheduleType === 'interval') {
         const mins = parseFloat(scheduleValue)
         if (isNaN(mins) || mins <= 0) {
@@ -962,6 +1181,7 @@ function TaskForm({
                 type="button"
                 onClick={() => {
                   setScheduleType(st)
+                  setError('')
                   if (st === 'once') {
                     if (task?.schedule_type === 'once') {
                       setScheduleValue(isoToDatetimeLocal(task.schedule_value))
@@ -973,7 +1193,11 @@ function TaskForm({
                     setOncePickerOpen(false)
                     return
                   }
-                  setScheduleValue('')
+                  if (st === 'interval') {
+                    setScheduleValue(task?.schedule_type === 'interval' ? msToMinutes(task.schedule_value) : '')
+                  } else {
+                    setScheduleValue('')
+                  }
                   setOnceMode(null)
                   setOncePickerOpen(false)
                 }}
@@ -1036,6 +1260,7 @@ function TaskForm({
                 </button>
               </div>
               <OnceDateTimePicker
+                key={scheduleValue || 'task-once-empty'}
                 value={scheduleValue}
                 onChange={setScheduleValue}
                 disabled={submitting}
@@ -1043,6 +1268,16 @@ function TaskForm({
                 onOpenChange={setOncePickerOpen}
               />
             </div>
+          ) : scheduleType === 'cron' ? (
+            <CronPresetBuilder
+              mode={cronMode}
+              draft={cronDraft}
+              customValue={cronCustomValue}
+              onModeChange={handleCronModeChange}
+              onDraftChange={(patch) => setCronDraft((current) => ({ ...current, ...patch }))}
+              onCustomValueChange={setCronCustomValue}
+              disabled={submitting}
+            />
           ) : (
             <input
               data-testid="task-input-schedule"
@@ -1056,9 +1291,6 @@ function TaskForm({
               }
               className="w-full px-3 py-2 text-sm rounded-md bg-accent/30 border border-border focus:outline-none focus:ring-1 focus:ring-ring"
             />
-          )}
-          {scheduleType === 'cron' && (
-            <p className="text-xs text-muted-foreground mt-1">{t.tasks.cronHelp}</p>
           )}
         </div>
 

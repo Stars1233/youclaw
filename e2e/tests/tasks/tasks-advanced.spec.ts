@@ -20,22 +20,31 @@ test.describe('Level 4: 高级功能', () => {
     // 切换到 cron
     await page.getByTestId('task-schedule-type-cron').click()
 
-    // 验证表单切换到了 Cron 输入
+    // 验证进入可视化 Cron 构造器
     await expect(page.getByText('Cron 表达式')).toBeVisible()
-
-    // 帮助文本可见
+    await expect(page.getByTestId('task-cron-mode-daily')).toBeVisible()
     await expect(page.getByText('标准 cron 格式')).toBeVisible()
+    await expect(page.getByTestId('task-cron-preview')).toHaveText('0 9 * * *')
 
-    await fillAndSubmitTaskForm(page, {
-      name: taskName,
-      prompt: 'Cron test prompt',
-      scheduleType: 'cron',
-      scheduleValue: '0 9 * * *',
-    })
+    await page.getByTestId('task-cron-mode-weekly').click()
+    await expect(page.getByTestId('task-cron-preview')).toHaveText('0 9 * * 1')
+
+    const responsePromise = page.waitForResponse(
+      (r) => r.url().includes('/api/tasks') && r.request().method() === 'POST' && r.status() === 201
+    )
+
+    await page.getByTestId('task-input-name').fill(taskName)
+    await page.getByTestId('task-input-prompt').fill('Cron test prompt')
+    await page.getByTestId('task-submit-btn').click()
+
+    const response = await responsePromise
+    const body = response.request().postDataJSON()
+    expect(body.scheduleType).toBe('cron')
+    expect(body.scheduleValue).toBe('0 9 * * 1')
 
     // 验证列表中出现
     await page.getByTestId('task-item').filter({ hasText: taskName }).click()
-    await expect(page.getByText('cron: 0 9 * * *').first()).toBeVisible()
+    await expect(page.getByText('cron: 0 9 * * 1').first()).toBeVisible()
   })
 
   test('创建 Once 类型', async ({ page }) => {
@@ -86,16 +95,20 @@ test.describe('Level 4: 高级功能', () => {
     expect(scheduleAt).toBeLessThanOrEqual(before + 31 * 60_000)
   })
 
-  test('切换调度类型清空值', async ({ page }) => {
+  test('切换调度类型时切到 Cron 默认展示可视化 preset', async ({ page }) => {
     await page.getByTestId('task-create-btn').click()
 
     // 默认 interval，填入值
     await page.getByTestId('task-input-schedule').fill('60')
     await expect(page.getByTestId('task-input-schedule')).toHaveValue('60')
 
-    // 切到 cron → 值清空
+    // 切到 cron → 展示默认 preset 预览
     await page.getByTestId('task-schedule-type-cron').click()
-    await expect(page.getByTestId('task-input-schedule')).toHaveValue('')
+    await expect(page.getByTestId('task-cron-preview')).toHaveText('0 9 * * *')
+
+    // 切到 custom 时会带入当前生成值，便于继续编辑
+    await page.getByTestId('task-cron-mode-custom').click()
+    await expect(page.getByTestId('task-input-schedule')).toHaveValue('0 9 * * *')
 
     // 切到 once → 值清空
     await page.getByTestId('task-schedule-type-once').click()

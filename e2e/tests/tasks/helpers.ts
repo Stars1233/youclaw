@@ -131,6 +131,9 @@ export async function fillAndSubmitTaskForm(
 
   if (opts.scheduleType === 'once') {
     await setOnceDateTime(page, opts.scheduleValue)
+  } else if (opts.scheduleType === 'cron') {
+    await page.getByTestId('task-cron-mode-custom').click()
+    await page.getByTestId('task-input-schedule').fill(opts.scheduleValue)
   } else {
     await page.getByTestId('task-input-schedule').fill(opts.scheduleValue)
   }

@@ -55,6 +55,7 @@ test.describe('Level 5: 边界情况与错误处理', () => {
     await page.getByTestId('task-create-btn').click()
     await page.getByTestId('task-input-prompt').fill('test prompt')
     await page.getByTestId('task-schedule-type-cron').click()
+    await page.getByTestId('task-cron-mode-custom').click()
     await page.getByTestId('task-input-schedule').fill('invalid-cron')
 
     await page.getByTestId('task-submit-btn').click()
