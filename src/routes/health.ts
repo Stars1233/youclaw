@@ -289,10 +289,16 @@ async function installBun(): Promise<{ ok: boolean; stdout: string; stderr: stri
     mkdirSync(tmpExtractDir, { recursive: true })
     const folderName = zipName.replace('.zip', '')
     if (process.platform === 'win32') {
-      execSync(
-        `powershell -NoProfile -Command "Expand-Archive -Force -Path '${tmpZip}' -DestinationPath '${tmpExtractDir}'"`,
-        { timeout: 60_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
-      )
+      try {
+        execSync(`tar -xf "${tmpZip}" -C "${tmpExtractDir}"`, {
+          timeout: 60_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+        })
+      } catch {
+        execSync(
+          `powershell -NoProfile -Command "Expand-Archive -Force -Path '${tmpZip}' -DestinationPath '${tmpExtractDir}'"`,
+          { timeout: 120_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+        )
+      }
     } else {
       execSync(`unzip -o "${tmpZip}" -d "${tmpExtractDir}"`, {
         timeout: 30_000, stdio: ['pipe', 'pipe', 'pipe'],
@@ -369,10 +375,16 @@ async function installGitWindows(): Promise<{ ok: boolean; stdout: string; stder
 
     // Extract
     mkdirSync(tmpExtractDir, { recursive: true })
-    execSync(
-      `powershell -NoProfile -Command "Expand-Archive -Force -Path '${tmpZip}' -DestinationPath '${tmpExtractDir}'"`,
-      { timeout: 60_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
-    )
+    try {
+      execSync(`tar -xf "${tmpZip}" -C "${tmpExtractDir}"`, {
+        timeout: 60_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+      })
+    } catch {
+      execSync(
+        `powershell -NoProfile -Command "Expand-Archive -Force -Path '${tmpZip}' -DestinationPath '${tmpExtractDir}'"`,
+        { timeout: 120_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+      )
+    }
 
     // Find the .exe inside extracted directory
     const { readdirSync } = await import('node:fs')
@@ -505,20 +517,29 @@ async function installUv(): Promise<{ ok: boolean; stdout: string; stderr: strin
     mkdirSync(tmpExtractDir, { recursive: true })
 
     if (target.format === 'zip') {
-      // Windows: zip archive
+      // Windows: use Bun's built-in JSZip-compatible decompress via shell
       const tmpZip = resolve(tmpdir(), `uv-install-${ts}.zip`)
       writeFileSync(tmpZip, Buffer.from(archiveBuffer))
-      logger.info({ category: 'install' }, `[install-uv] Extracting zip...`)
-      execSync(
-        `powershell -NoProfile -Command "Expand-Archive -Force -Path '${tmpZip}' -DestinationPath '${tmpExtractDir}'"`,
-        { timeout: 60_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
-      )
+      logger.info({ category: 'install' }, `[install-uv] Extracting zip to ${tmpExtractDir}...`)
+      try {
+        // Use tar (available on Windows 10+) which is faster and more reliable than PowerShell
+        execSync(`tar -xf "${tmpZip}" -C "${tmpExtractDir}"`, {
+          timeout: 60_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+        })
+      } catch {
+        // Fallback to PowerShell if tar is not available
+        logger.info({ category: 'install' }, `[install-uv] tar failed, trying PowerShell...`)
+        execSync(
+          `powershell -NoProfile -Command "Expand-Archive -Force -Path '${tmpZip}' -DestinationPath '${tmpExtractDir}'"`,
+          { timeout: 120_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+        )
+      }
       try { const { rmSync } = await import('node:fs'); rmSync(tmpZip, { force: true }) } catch {}
     } else {
       // macOS/Linux: tar.gz archive
       const tmpTar = resolve(tmpdir(), `uv-install-${ts}.tar.gz`)
       writeFileSync(tmpTar, Buffer.from(archiveBuffer))
-      logger.info({ category: 'install' }, `[install-uv] Extracting tar.gz...`)
+      logger.info({ category: 'install' }, `[install-uv] Extracting tar.gz to ${tmpExtractDir}...`)
       execSync(`tar -xzf "${tmpTar}" -C "${tmpExtractDir}"`, {
         timeout: 30_000, stdio: ['pipe', 'pipe', 'pipe'],
       })
