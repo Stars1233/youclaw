@@ -16,6 +16,7 @@ import { SkillsLoader, SkillsWatcher, RegistryManager } from './skills/index.ts'
 import { MemoryManager, MemoryIndexer } from './memory/index.ts'
 import { Scheduler } from './scheduler/index.ts'
 import { IpcWatcher, refreshTasksSnapshot } from './ipc/index.ts'
+import { BrowserManager } from './browser/index.ts'
 import { createApp } from './routes/index.ts'
 
 async function main() {
@@ -57,6 +58,16 @@ async function main() {
 
   // 4. Create EventBus
   const eventBus = new EventBus()
+
+  // 4b. Initialize browser subsystem and ensure the default managed profile exists
+  const browserManager = new BrowserManager()
+  try {
+    browserManager.ensureDefaultProfile()
+    logger.info('Browser manager initialized')
+  } catch (err) {
+    logger.error({ err }, '[STARTUP] Step 4b failed: init browser manager')
+    throw err
+  }
 
   // 5. Create SkillsLoader and SkillsWatcher
   let skillsLoader: SkillsLoader
@@ -238,7 +249,7 @@ async function main() {
   }
 
   // 17. Create HTTP server
-  const app = createApp({ agentManager, agentQueue, eventBus, router, channelManager, skillsLoader, registryManager, memoryManager, memoryIndexer, scheduler })
+  const app = createApp({ agentManager, agentQueue, eventBus, router, channelManager, skillsLoader, registryManager, memoryManager, memoryIndexer, scheduler, browserManager })
 
   let server: ReturnType<typeof Bun.serve>
   try {
