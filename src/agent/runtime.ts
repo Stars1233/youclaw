@@ -743,7 +743,7 @@ export class AgentRuntime {
     let fullText = ''
     let sessionId = existingSessionId ?? ''
     const resolvedBrowserProfile = this.browserManager
-      ? this.browserManager.resolveProfileSelection(browserProfileId, this.config.browserProfile)
+      ? this.browserManager.resolveProfileSelection(browserProfileId, this.config.browser?.defaultProfile ?? this.config.browserProfile)
       : null
     const effectiveBrowserProfileId = resolvedBrowserProfile?.id
 

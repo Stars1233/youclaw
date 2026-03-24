@@ -21,6 +21,6 @@ describe('browser runtime wiring', () => {
     const runtime = read('src/agent/runtime.ts')
 
     expect(runtime).toContain("mcpServers['browser'] = createBrowserMcpServer({")
-    expect(runtime).toContain('resolveProfileSelection(browserProfileId, this.config.browserProfile)')
+    expect(runtime).toContain('resolveProfileSelection(browserProfileId, this.config.browser?.defaultProfile ?? this.config.browserProfile)')
   })
 })

@@ -323,7 +323,8 @@ export class BrowserManager {
 
     const updatedAgents: string[] = []
     for (const agent of this.agentManager.getAgents()) {
-      if (agent.browserProfile === profileId) {
+      const configuredProfileId = agent.browser?.defaultProfile ?? agent.browserProfile
+      if (configuredProfileId === profileId) {
         updatedAgents.push(agent.id)
       }
     }
@@ -337,8 +338,22 @@ export class BrowserManager {
       try {
         const raw = readFileSync(configPath, 'utf-8')
         const config = parseYaml(raw) as Record<string, unknown> | null
-        if (!config || config.browserProfile !== profileId) continue
-        delete config.browserProfile
+        if (!config) continue
+
+        const browserSection = config.browser as Record<string, unknown> | undefined
+        const matchesLegacy = config.browserProfile === profileId
+        const matchesStructured = browserSection?.defaultProfile === profileId
+        if (!matchesLegacy && !matchesStructured) continue
+
+        if (matchesLegacy) {
+          delete config.browserProfile
+        }
+        if (matchesStructured && browserSection) {
+          delete browserSection.defaultProfile
+          if (Object.keys(browserSection).length === 0) {
+            delete config.browser
+          }
+        }
         writeFileSync(configPath, stringifyYaml(config))
       } catch {}
     }
