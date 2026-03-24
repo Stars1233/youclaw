@@ -281,6 +281,7 @@ async function main() {
   const shutdown = async () => {
     logger.info('Shutting down...')
     await channelManager.disconnectAll()
+    await browserManager.shutdown().catch(() => {})
     skillsWatcher.stop()
     ipcWatcher.stop()
     scheduler.stop()

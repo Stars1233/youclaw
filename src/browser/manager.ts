@@ -5,6 +5,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { getLogger } from '../logger/index.ts'
 import { getPaths } from '../config/index.ts'
 import type { AgentManager } from '../agent/index.ts'
+import { disconnectAllBrowserSessions } from './pw-session.ts'
 import {
   createBrowserProfile,
   deleteBrowserProfile,
@@ -174,6 +175,14 @@ export class BrowserManager {
       lastError: null,
       heartbeatAt: new Date().toISOString(),
     })
+  }
+
+  async shutdown(): Promise<void> {
+    await disconnectAllBrowserSessions()
+    const profiles = listBrowserProfiles().filter((profile) => profile.driver === 'managed')
+    for (const profile of profiles) {
+      await this.stopProfile(profile.id).catch(() => {})
+    }
   }
 
   private async startProfileInternal(id: string): Promise<BrowserProfileRuntime> {

@@ -47,4 +47,11 @@ describe('browser manager', () => {
     const status = await statusRes.json() as { status: string }
     expect(status.status).toBe('stopped')
   })
+
+  test('shutdown is safe when no managed browser is running', async () => {
+    const manager = new BrowserManager()
+    manager.ensureDefaultProfile()
+
+    await expect(manager.shutdown()).resolves.toBeUndefined()
+  })
 })
