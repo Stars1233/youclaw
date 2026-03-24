@@ -34,11 +34,6 @@ export class PromptBuilder {
     const agentMemoryPath = resolve(agentMemoryDir, 'MEMORY.md')
     const globalMemoryPath = resolve(getPaths().agents, '_global', 'memory', 'MEMORY.md')
 
-    // IPC absolute paths (agent writes here, IPC Watcher reads from here)
-    const agentId = context?.agentId ?? 'default'
-    const ipcTasksDir = resolve(getPaths().data, 'ipc', agentId, 'tasks')
-    const ipcCurrentTasksPath = resolve(getPaths().data, 'ipc', agentId, 'current_tasks.json')
-
     // Load workspace MD files in order
     for (const filename of WORKSPACE_FILES) {
       let content = this.loadMdFile(workspaceDir, filename)
@@ -48,8 +43,6 @@ export class PromptBuilder {
           .replaceAll('{{agentMemoryDir}}', agentMemoryDir)
           .replaceAll('{{agentMemoryPath}}', agentMemoryPath)
           .replaceAll('{{globalMemoryPath}}', globalMemoryPath)
-          .replaceAll('{{ipcTasksDir}}', ipcTasksDir)
-          .replaceAll('{{ipcCurrentTasksPath}}', ipcCurrentTasksPath)
         parts.push(content)
       }
     }
@@ -106,10 +99,17 @@ export class PromptBuilder {
       `If document parsing fails, be explicit about the failure instead of pretending the document was read.`
     )
 
+    parts.push(
+      `## Scheduled Task Rule\n` +
+      `Use \`mcp__task__list_tasks\` to inspect existing tasks and always call it before any write operation.\n` +
+      `Use \`mcp__task__update_task\` for create/update/pause/resume/delete actions.\n` +
+      `Do NOT use file-based IPC JSON for task management.`
+    )
+
     // Inject current context (needed when agent creates scheduled tasks)
     if (context) {
       parts.push(
-        `\n## Current Context\n- Agent ID: ${context.agentId}\n- Chat ID: ${context.chatId}\n- IPC Directory: ${ipcTasksDir}`,
+        `\n## Current Context\n- Agent ID: ${context.agentId}\n- Chat ID: ${context.chatId}`,
       )
     }
 

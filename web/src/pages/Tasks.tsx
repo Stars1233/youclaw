@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getTaskList,
   createScheduledTask,
@@ -14,6 +14,10 @@ import { cn } from '../lib/utils'
 import { useI18n } from '../i18n'
 import { SidePanel } from '@/components/layout/SidePanel'
 import { useDragRegion } from "@/hooks/useDragRegion"
+import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Input } from '@/components/ui/input'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import {
@@ -23,10 +27,14 @@ import {
   Pause,
   Trash2,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   XCircle,
   Timer,
   CalendarClock,
+  CalendarDays,
   Copy,
+  Clock3,
   Pencil,
   PlayCircle,
 } from 'lucide-react'
@@ -76,16 +84,49 @@ function msToMinutes(ms: string): string {
   return String(n / 60_000)
 }
 
+function pad2(n: number): string {
+  return n.toString().padStart(2, '0')
+}
+
+function formatDatetimeLocal(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
 // Convert ISO time to datetime-local format
 function isoToDatetimeLocal(iso: string): string {
   try {
-    const d = new Date(iso)
-    const pad = (n: number) => n.toString().padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    return formatDatetimeLocal(new Date(iso))
   } catch {
     return iso
   }
 }
+
+function parseDatetimeLocal(value: string): Date | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+function createDefaultOnceDate(): Date {
+  const next = new Date()
+  next.setSeconds(0, 0)
+  next.setMinutes(next.getMinutes() + 1)
+  return next
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function shiftMonth(date: Date, offset: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + offset, 1)
+}
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => pad2(hour))
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, minute) => pad2(minute))
+const WHEEL_ITEM_HEIGHT = 40
+const WHEEL_VISIBLE_ROWS = 5
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -101,6 +142,21 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 type PanelMode = 'view' | 'create' | 'edit'
+type OnceMode = 'in5m' | 'in30m' | 'in1h' | 'tomorrow9' | 'custom' | null
+
+function createRelativeOnceDate(minutesFromNow: number): Date {
+  const next = new Date()
+  next.setSeconds(0, 0)
+  next.setMinutes(next.getMinutes() + minutesFromNow)
+  return next
+}
+
+function createTomorrowAtNine(): Date {
+  const next = new Date()
+  next.setDate(next.getDate() + 1)
+  next.setHours(9, 0, 0, 0)
+  return next
+}
 
 export function Tasks() {
   const { t } = useI18n()
@@ -447,6 +503,272 @@ function InfoField({ label, value, mono, children }: { label: string; value?: st
   )
 }
 
+function WheelPicker({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  testIdPrefix,
+}: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  disabled?: boolean
+  testIdPrefix: string
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const scrollTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const index = options.indexOf(value)
+    if (index === -1) return
+    const targetTop = index * WHEEL_ITEM_HEIGHT
+    if (Math.abs(container.scrollTop - targetTop) > 1) {
+      container.scrollTo({ top: targetTop, behavior: 'auto' })
+    }
+  }, [options, value])
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current !== null) {
+        window.clearTimeout(scrollTimerRef.current)
+      }
+    }
+  }, [])
+
+  const commitFromScroll = () => {
+    const container = containerRef.current
+    if (!container) return
+    const index = Math.max(0, Math.min(options.length - 1, Math.round(container.scrollTop / WHEEL_ITEM_HEIGHT)))
+    const nextValue = options[index]
+    if (nextValue && nextValue !== value) {
+      onChange(nextValue)
+    }
+    container.scrollTo({ top: index * WHEEL_ITEM_HEIGHT, behavior: 'smooth' })
+  }
+
+  const handleScroll = () => {
+    if (disabled) return
+    if (scrollTimerRef.current !== null) {
+      window.clearTimeout(scrollTimerRef.current)
+    }
+    scrollTimerRef.current = window.setTimeout(() => {
+      commitFromScroll()
+    }, 80)
+  }
+
+  const handleClick = (nextValue: string) => {
+    if (disabled) return
+    onChange(nextValue)
+    const index = options.indexOf(nextValue)
+    if (index >= 0) {
+      containerRef.current?.scrollTo({ top: index * WHEEL_ITEM_HEIGHT, behavior: 'smooth' })
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Clock3 className="h-3.5 w-3.5" />
+        <span>{label}</span>
+      </div>
+      <div
+        data-testid={testIdPrefix}
+        data-value={value}
+        className="relative"
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 rounded-md border border-primary/30 bg-primary/5" style={{ height: WHEEL_ITEM_HEIGHT }} />
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="relative h-[200px] overflow-y-auto rounded-md border border-input bg-background [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          style={{
+            paddingTop: `${((WHEEL_VISIBLE_ROWS - 1) / 2) * WHEEL_ITEM_HEIGHT}px`,
+            paddingBottom: `${((WHEEL_VISIBLE_ROWS - 1) / 2) * WHEEL_ITEM_HEIGHT}px`,
+          }}
+        >
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              data-testid={`${testIdPrefix}-option-${option}`}
+              aria-selected={value === option}
+              onClick={() => handleClick(option)}
+              disabled={disabled}
+              className={cn(
+                'flex w-full snap-center items-center justify-center text-base transition-colors',
+                value === option ? 'text-foreground font-semibold' : 'text-muted-foreground hover:text-foreground',
+                disabled && 'cursor-not-allowed opacity-50',
+              )}
+              style={{ height: WHEEL_ITEM_HEIGHT }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OnceDateTimePicker({
+  value,
+  onChange,
+  disabled,
+  open,
+  onOpenChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const { t } = useI18n()
+  const initialValue = parseDatetimeLocal(value) ?? createDefaultOnceDate()
+  const [selectedDate, setSelectedDate] = useState<Date>(initialValue)
+  const [visibleMonth, setVisibleMonth] = useState<Date>(startOfMonth(initialValue))
+  const [hour, setHour] = useState(() => pad2(initialValue.getHours()))
+  const [minute, setMinute] = useState(() => pad2(initialValue.getMinutes()))
+
+  useEffect(() => {
+    const next = parseDatetimeLocal(value) ?? createDefaultOnceDate()
+    setSelectedDate(next)
+    setVisibleMonth(startOfMonth(next))
+    setHour(pad2(next.getHours()))
+    setMinute(pad2(next.getMinutes()))
+  }, [value])
+
+  const commit = (date: Date, nextHour: string, nextMinute: string) => {
+    const next = new Date(date)
+    next.setHours(Number(nextHour), Number(nextMinute), 0, 0)
+    onChange(formatDatetimeLocal(next))
+  }
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return
+    setSelectedDate(date)
+    setVisibleMonth(startOfMonth(date))
+    commit(date, hour, minute)
+  }
+
+  const handleHourChange = (nextHour: string) => {
+    setHour(nextHour)
+    commit(selectedDate, nextHour, minute)
+  }
+
+  const handleMinuteChange = (nextMinute: string) => {
+    setMinute(nextMinute)
+    commit(selectedDate, hour, nextMinute)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverAnchor asChild>
+        <Input
+          data-testid="task-input-schedule"
+          readOnly
+          value={value || t.tasks.onceHelp}
+          disabled={disabled}
+          tabIndex={-1}
+          className={cn(
+            "cursor-default bg-accent/30 select-none",
+            !value && "text-muted-foreground"
+          )}
+        />
+      </PopoverAnchor>
+      <PopoverContent
+        data-testid="task-once-popover"
+        align="end"
+        side="bottom"
+        sideOffset={8}
+        avoidCollisions={false}
+        className="h-[312px] w-[412px] p-0 overflow-hidden"
+      >
+        <div className="flex h-full">
+          <div className="w-[268px] shrink-0 border-r border-border p-2.5">
+            <div className="mb-1.5 flex items-center gap-2 text-sm font-medium">
+              <CalendarDays className="h-4 w-4" />
+              <span>{t.tasks.runAt}</span>
+            </div>
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                type="button"
+                data-testid="calendar-previous-month"
+                onClick={() => setVisibleMonth((current) => shiftMonth(current, -1))}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-transparent p-0 text-muted-foreground hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="text-sm font-medium">
+                {visibleMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+              </div>
+              <button
+                type="button"
+                data-testid="calendar-next-month"
+                onClick={() => setVisibleMonth((current) => shiftMonth(current, 1))}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-transparent p-0 text-muted-foreground hover:text-foreground"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <Calendar
+              className="p-0"
+              hideNavigation
+              classNames={{
+                month: "w-[248px] space-y-2",
+                month_caption: "hidden",
+                weekdays: "flex w-full",
+                weekday: "w-8 text-[11px] font-normal text-muted-foreground",
+                week: "mt-1.5 flex w-full",
+                day: "h-8 w-8 p-0 text-center text-sm",
+                day_button: "h-8 w-8 rounded-md p-0 font-normal aria-selected:opacity-100",
+              }}
+              mode="single"
+              month={visibleMonth}
+              onMonthChange={setVisibleMonth}
+              selected={selectedDate}
+              onSelect={handleDateSelect}
+              dayButtonTestIdPrefix="task-once-day"
+            />
+          </div>
+
+          <div className="flex w-[144px] flex-col bg-accent/10 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <WheelPicker
+                label={t.tasks.hour}
+                value={hour}
+                options={HOUR_OPTIONS}
+                onChange={handleHourChange}
+                disabled={disabled}
+                testIdPrefix="task-once-hour"
+              />
+              <WheelPicker
+                label={t.tasks.minute}
+                value={minute}
+                options={MINUTE_OPTIONS}
+                onChange={handleMinuteChange}
+                disabled={disabled}
+                testIdPrefix="task-once-minute"
+              />
+            </div>
+
+            <div className="mt-auto">
+              <Button type="button" size="sm" className="w-full" onClick={() => onOpenChange(false)}>
+                {t.common.confirm}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 // ===== Task form (shared for create + edit) =====
 
 function TaskForm({
@@ -476,8 +798,35 @@ function TaskForm({
     if (task.schedule_type === 'once') return isoToDatetimeLocal(task.schedule_value)
     return task.schedule_value
   })
+  const [onceMode, setOnceMode] = useState<OnceMode>(() =>
+    task?.schedule_type === 'once' ? 'custom' : null
+  )
+  const [oncePickerOpen, setOncePickerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  const applyOncePreset = (mode: Exclude<OnceMode, 'custom' | null>) => {
+    const next =
+      mode === 'in5m'
+        ? createRelativeOnceDate(5)
+        : mode === 'in30m'
+          ? createRelativeOnceDate(30)
+          : mode === 'in1h'
+            ? createRelativeOnceDate(60)
+            : createTomorrowAtNine()
+
+    setOnceMode(mode)
+    setOncePickerOpen(false)
+    setScheduleValue(formatDatetimeLocal(next))
+  }
+
+  const openCustomOncePicker = () => {
+    if (!scheduleValue) {
+      setScheduleValue(formatDatetimeLocal(createDefaultOnceDate()))
+    }
+    setOnceMode('custom')
+    setOncePickerOpen(true)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -613,7 +962,20 @@ function TaskForm({
                 type="button"
                 onClick={() => {
                   setScheduleType(st)
+                  if (st === 'once') {
+                    if (task?.schedule_type === 'once') {
+                      setScheduleValue(isoToDatetimeLocal(task.schedule_value))
+                      setOnceMode('custom')
+                    } else {
+                      setScheduleValue('')
+                      setOnceMode(null)
+                    }
+                    setOncePickerOpen(false)
+                    return
+                  }
                   setScheduleValue('')
+                  setOnceMode(null)
+                  setOncePickerOpen(false)
                 }}
                 className={cn(
                   'px-3 py-1.5 text-xs rounded-md border transition-colors',
@@ -635,20 +997,66 @@ function TaskForm({
             {scheduleType === 'cron' && t.tasks.cronExpression}
             {scheduleType === 'once' && t.tasks.runAt}
           </label>
-          <input
-            data-testid="task-input-schedule"
-            type={scheduleType === 'once' ? 'datetime-local' : 'text'}
-            value={scheduleValue}
-            onChange={(e) => setScheduleValue(e.target.value)}
-            placeholder={
-              scheduleType === 'interval'
-                ? t.tasks.intervalPlaceholder
-                : scheduleType === 'cron'
-                  ? t.tasks.cronPlaceholder
-                  : ''
-            }
-            className="w-full px-3 py-2 text-sm rounded-md bg-accent/30 border border-border focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+          {scheduleType === 'once' ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { mode: 'in5m', label: t.tasks.onceQuick5m, testId: 'task-once-preset-5m' },
+                  { mode: 'in30m', label: t.tasks.onceQuick30m, testId: 'task-once-preset-30m' },
+                  { mode: 'in1h', label: t.tasks.onceQuick1h, testId: 'task-once-preset-1h' },
+                  { mode: 'tomorrow9', label: t.tasks.onceQuickTomorrow9, testId: 'task-once-preset-tomorrow9' },
+                ] as const).map((option) => (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    data-testid={option.testId}
+                    onClick={() => applyOncePreset(option.mode)}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 text-xs transition-colors',
+                      onceMode === option.mode
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-accent/20 text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  data-testid="task-once-preset-custom"
+                  onClick={openCustomOncePicker}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 text-xs transition-colors',
+                    onceMode === 'custom'
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-accent/20 text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {t.tasks.onceQuickCustom}
+                </button>
+              </div>
+              <OnceDateTimePicker
+                value={scheduleValue}
+                onChange={setScheduleValue}
+                disabled={submitting}
+                open={oncePickerOpen}
+                onOpenChange={setOncePickerOpen}
+              />
+            </div>
+          ) : (
+            <input
+              data-testid="task-input-schedule"
+              type="text"
+              value={scheduleValue}
+              onChange={(e) => setScheduleValue(e.target.value)}
+              placeholder={
+                scheduleType === 'interval'
+                  ? t.tasks.intervalPlaceholder
+                  : t.tasks.cronPlaceholder
+              }
+              className="w-full px-3 py-2 text-sm rounded-md bg-accent/30 border border-border focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          )}
           {scheduleType === 'cron' && (
             <p className="text-xs text-muted-foreground mt-1">{t.tasks.cronHelp}</p>
           )}
