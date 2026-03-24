@@ -11,6 +11,7 @@ import { resolve } from 'node:path'
 import { PromptBuilder } from '../src/agent/prompt-builder.ts'
 import type { AgentConfig } from '../src/agent/types.ts'
 import { loadEnv } from '../src/config/env.ts'
+import { initLogger } from '../src/logger/index.ts'
 import { tmpdir } from 'node:os'
 import { clearAllBootstrapSnapshots } from '../src/agent/bootstrap-cache.ts'
 
@@ -18,6 +19,7 @@ const systemPromptPath = resolve(import.meta.dir, '../prompts/system.md')
 const content = readFileSync(systemPromptPath, 'utf-8')
 
 loadEnv()
+initLogger()
 
 describe('system.md — IPC documentation', () => {
   test('contains schedule_task example', () => {

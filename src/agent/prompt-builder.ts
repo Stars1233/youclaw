@@ -233,7 +233,6 @@ export class PromptBuilder {
     try {
       let envPrompt = readFileSync(envPath, 'utf-8')
       envPrompt = envPrompt
-        .replace('{{date}}', new Date().toISOString().split('T')[0]!)
         .replace('{{os}}', process.platform)
         .replace('{{platform}}', process.arch)
         .replace('{{cwd}}', process.cwd())

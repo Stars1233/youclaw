@@ -5,6 +5,12 @@ import { EventBus } from '../src/events/bus.ts'
 import { MessageRouter } from '../src/channel/router.ts'
 import type { InboundMessage, Channel } from '../src/channel/types.ts'
 
+function expectTimestampedPrompt(value: unknown, expectedMessage: string) {
+  expect(value).toEqual(expect.stringMatching(
+    new RegExp(`^\\[[A-Z][a-z]{2} \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} .+\\] ${expectedMessage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+  ))
+}
+
 function createMessage(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return {
     id: 'msg-1',
@@ -112,7 +118,7 @@ describe('MessageRouter.handleInbound', () => {
     expect(enqueue).toHaveBeenCalledTimes(1)
     expect(enqueue.mock.calls[0]?.[0]).toBe('agent-1')
     expect(enqueue.mock.calls[0]?.[1]).toBe('web:chat-1')
-    expect(enqueue.mock.calls[0]?.[2]).toBe('summarize report')
+    expectTimestampedPrompt(enqueue.mock.calls[0]?.[2], 'summarize report')
     expect(enqueue.mock.calls[0]?.[3]).toMatchObject({
       requestedSkills: ['pdf', 'agent-browser'],
     })
@@ -162,10 +168,32 @@ describe('MessageRouter.handleInbound', () => {
     }))
 
     expect(loadAllSkills).toHaveBeenCalledTimes(0)
-    expect(enqueue.mock.calls[0]?.[2]).toBe('/pdf keep raw content')
+    expectTimestampedPrompt(enqueue.mock.calls[0]?.[2], '/pdf keep raw content')
     expect(enqueue.mock.calls[0]?.[3]).toMatchObject({
       requestedSkills: ['explicit-skill'],
     })
+  })
+
+  test('injects a timestamp envelope for the agent prompt while storing raw message content', async () => {
+    const enqueue = mock(() => Promise.resolve('ok'))
+    const router = new MessageRouter(
+      {
+        resolveAgent: () => createManagedAgent(),
+      } as any,
+      { enqueue } as any,
+      new EventBus(),
+    )
+
+    await router.handleInbound(createMessage({
+      content: '现在几点了',
+      timestamp: '2026-03-24T12:01:00.000Z',
+    }))
+
+    expectTimestampedPrompt(enqueue.mock.calls[0]?.[2], '现在几点了')
+
+    const messages = getMessages('web:chat-1', 10)
+    expect(messages.some((message) => message.content === '现在几点了')).toBe(true)
+    expect(messages.some((message) => message.content.includes('[Tue 2026-03-24'))).toBe(false)
   })
 })
 

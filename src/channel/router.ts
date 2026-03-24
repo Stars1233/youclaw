@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { getLogger } from '../logger/index.ts'
 import type { MemoryManager } from '../memory/index.ts'
 import type { SkillsLoader } from '../skills/index.ts'
+import { injectMessageTimestamp } from '../agent/message-timestamp.ts'
 import { parseSkillInvocations } from '../skills/invoke.ts'
 import type { InboundMessage, Channel } from './types.ts'
 
@@ -122,10 +123,14 @@ export class MessageRouter {
 
     // Enqueue for processing (pass requestedSkills)
     try {
+      const contentForModel = injectMessageTimestamp(contentForAgent, {
+        timestamp: message.timestamp,
+      })
+
       const reply = await this.agentQueue.enqueue(
         config.id,
         message.chatId,
-        contentForAgent,
+        contentForModel,
         {
           requestedSkills: requestedSkills.length > 0 ? requestedSkills : undefined,
           browserProfileId: message.browserProfileId,
