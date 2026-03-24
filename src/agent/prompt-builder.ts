@@ -3,10 +3,9 @@ import { resolve } from 'node:path'
 import { getPaths } from '../config/index.ts'
 import { inferChannelType } from '../channel/config-schema.ts'
 import { getLogger } from '../logger/index.ts'
-import { getBrowserProfile } from '../db/index.ts'
-import { detectChromePath } from '../utils/chrome.ts'
 import type { SkillsLoader } from '../skills/index.ts'
 import type { MemoryManager } from '../memory/index.ts'
+import type { BrowserDriver } from '../browser/index.ts'
 import type { AgentConfig } from './types.ts'
 import { getOrLoadBootstrapDocs } from './bootstrap-cache.ts'
 
@@ -38,7 +37,17 @@ export class PromptBuilder {
   build(
     workspaceDir: string,
     config: AgentConfig,
-    context?: { agentId: string; chatId: string; requestedSkills?: string[]; browserProfileId?: string },
+    context?: {
+      agentId: string
+      chatId: string
+      requestedSkills?: string[]
+      browserProfileId?: string
+      browserProfile?: {
+        id: string
+        driver: BrowserDriver
+        userDataDir: string | null
+      }
+    },
   ): string {
     const parts: string[] = []
 
@@ -91,10 +100,25 @@ export class PromptBuilder {
       }
     }
 
-    // Inject browser profile context
-    const browserCtx = this.buildBrowserProfileContext(config, context?.browserProfileId)
-    if (browserCtx) {
-      parts.push(browserCtx)
+    if (context?.browserProfileId) {
+      const fallbackHint = context.browserProfile?.driver === 'managed' && context.browserProfile.userDataDir
+        ? `\nIf you must use legacy \`agent-browser\` for unsupported operations, reuse this managed profile:\n` +
+          '```bash\n' +
+          `agent-browser --session ${context.browserProfile.id} --profile ${context.browserProfile.userDataDir} <command>\n` +
+          '```'
+        : '\nIf you must use legacy `agent-browser` for unsupported operations, prefer the built-in browser MCP tools first because legacy commands may not share the same browser runtime state.'
+
+      parts.push(
+        `## Browser Tools\n` +
+        `This chat is connected to browser profile "${context.browserProfileId}". ` +
+        `Prefer the built-in \`mcp__browser__*\` tools for common browser interaction: status, list_tabs, open_tab, navigate, snapshot, screenshot, click, type, press_key, and close_tab.\n` +
+        `Use the legacy \`agent-browser\` skill only when you need capabilities not yet covered by the built-in browser tools, such as interactive element refs, explicit waits, select/check, get text, PDF export, visual diff, or state import/export.\n` +
+        `Manual login is the default and recommended flow for sites that require authentication. Do NOT ask the user for credentials, passwords, 2FA codes, recovery codes, or session secrets. Ask the user to sign in manually in the browser profile instead.\n` +
+        `Automated login attempts often trigger anti-bot or account-security defenses. If the site shows CAPTCHA, 2FA, device verification, suspicious-login prompts, or other security checks, stop automated login attempts and ask the user to take over manually.\n` +
+        `For sensitive or high-impact actions, prepare the page and then ask the user to review, confirm, or complete the final step manually. This includes purchases, payments, transfers, account-security changes, password resets, OAuth consent, message sending, posting, publishing, deleting data, or submitting legal/financial forms.\n` +
+        `For strict sites such as social media posting or other anti-bot-sensitive flows, prefer manual user interaction for the final sensitive steps even if navigation succeeds.` +
+        fallbackHint
+      )
     }
 
     // Inject memory context
@@ -218,38 +242,6 @@ export class PromptBuilder {
       return null
     }
   }
-
-  /**
-   * Build browser profile context
-   */
-  private buildBrowserProfileContext(config: AgentConfig, overrideBrowserProfileId?: string): string | null {
-    const profileId = overrideBrowserProfileId ?? config.browserProfile
-    if (!profileId) return null
-    const profile = getBrowserProfile(profileId)
-    if (!profile) return null
-    const profileDir = resolve(getPaths().browserProfiles, profile.id)
-
-    // Detect system Chrome executable
-    const chromePath = detectChromePath()
-    const execFlag = chromePath ? ` --executable-path "${chromePath}"` : ''
-
-    return [
-      `## Browser Profile`,
-      ``,
-      `You have a persistent browser profile "${profile.name}" bound to this chat.`,
-      `When using agent-browser, ALWAYS include these flags:`,
-      ``,
-      '```bash',
-      `agent-browser --session ${profile.id} --profile ${profileDir} --headed${execFlag} open https://example.com`,
-      '```',
-      ``,
-      `### Error Handling`,
-      `- If agent-browser fails because Chrome is not found, try \`agent-browser install chrome\` then retry once.`,
-      `- If headed mode still fails, drop \`--headed\` and use headless mode (keep --profile and --session).`,
-      `- Do NOT retry the same failing command more than 2 times. Inform the user if it cannot be resolved.`,
-    ].join('\n')
-  }
-
   private buildChannelContext(chatId?: string): string | null {
     if (!chatId) return null
 
@@ -280,5 +272,4 @@ export class PromptBuilder {
     if (firstColon <= 0 || firstColon === rest.length - 1) return null
     return rest.slice(firstColon + 1)
   }
-
 }

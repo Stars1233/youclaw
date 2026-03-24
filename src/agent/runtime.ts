@@ -19,6 +19,8 @@ import { abortRegistry } from './abort-registry.ts'
 import { getActiveModelConfig } from '../settings/manager.ts'
 import { getAuthToken } from '../routes/auth.ts'
 import { resolvePiModel } from './model-resolver.ts'
+import type { BrowserManager } from '../browser/index.ts'
+import { createBrowserMcpServer, logBrowserToolRegistration } from '../browser/index.ts'
 import type { SkillsLoader } from '../skills/loader.ts'
 import type { MemoryManager } from '../memory/index.ts'
 import { buildRecoveredConversationPrompt, resolveStoredSessionFile, type StoredSessionEntry } from './context-utils.ts'
@@ -54,6 +56,7 @@ export class AgentRuntime {
   private hooksManager: HooksManager | null
   private skillsLoader: SkillsLoader | null
   private memoryManager: MemoryManager | null
+  private browserManager: BrowserManager | null
 
   constructor(
     config: AgentConfig,
@@ -62,6 +65,7 @@ export class AgentRuntime {
     hooksManager?: HooksManager,
     skillsLoader?: SkillsLoader,
     memoryManager?: MemoryManager,
+    browserManager?: BrowserManager,
   ) {
     this.config = config
     this.eventBus = eventBus
@@ -69,6 +73,7 @@ export class AgentRuntime {
     this.hooksManager = hooksManager ?? null
     this.skillsLoader = skillsLoader ?? null
     this.memoryManager = memoryManager ?? null
+    this.browserManager = browserManager ?? null
   }
 
   /**
@@ -140,6 +145,7 @@ export class AgentRuntime {
         chatId,
         existingSession,
         modelConfig,
+        params.browserProfileId,
         params.requestedSkills,
         params.attachments,
       )
@@ -226,6 +232,7 @@ export class AgentRuntime {
     chatId: string,
     existingSession: StoredSessionEntry | null,
     modelConfig: { apiKey: string; baseUrl: string; modelId: string; provider: string },
+    browserProfileId?: string,
     requestedSkills?: string[],
     attachments?: Array<{ filename: string; mediaType: string; filePath?: string; data?: string; size?: number }>,
   ): Promise<{ fullText: string; sessionId: string; sessionFile: string | null }> {
@@ -233,13 +240,29 @@ export class AgentRuntime {
     const env = getEnv()
     const abortController = new AbortController()
     abortRegistry.register(chatId, abortController)
+    const resolvedBrowserProfile = this.browserManager
+      ? this.browserManager.resolveProfileSelection(browserProfileId, this.config.browser?.defaultProfile ?? this.config.browserProfile)
+      : null
+    const effectiveBrowserProfileId = resolvedBrowserProfile?.id
 
     let fullText = ''
 
     const systemPrompt = this.promptBuilder.build(
       this.config.workspaceDir,
       this.config,
-      { agentId, chatId, requestedSkills },
+      {
+        agentId,
+        chatId,
+        requestedSkills,
+        browserProfileId: effectiveBrowserProfileId,
+        browserProfile: resolvedBrowserProfile
+          ? {
+              id: resolvedBrowserProfile.id,
+              driver: resolvedBrowserProfile.driver,
+              userDataDir: resolvedBrowserProfile.userDataDir,
+            }
+          : undefined,
+      },
     )
 
     const cwd = this.config.workspaceDir
@@ -264,7 +287,7 @@ export class AgentRuntime {
       : SessionManager.create(cwd, sessionsDir)
 
     const tools = this.filterConfiguredTools(createCodingTools(cwd))
-    const customTools = this.filterConfiguredTools(this.buildCustomTools(chatId))
+    const customTools = this.filterConfiguredTools(this.buildCustomTools(chatId, agentId, effectiveBrowserProfileId))
 
     logger.info({
       agentId,
@@ -274,6 +297,7 @@ export class AgentRuntime {
       provider: model.provider,
       isResume: !!existingSessionFile,
       sessionFile: existingSessionFile ?? sessionManager.getSessionFile(),
+      browserProfileId: effectiveBrowserProfileId,
       category: 'agent',
     }, 'Creating agent session')
 
@@ -577,12 +601,25 @@ export class AgentRuntime {
     return `${prompt}\n\n${parts.join('\n\n')}`.trim()
   }
 
-  private buildCustomTools(chatId: string): ToolDefinition[] {
+  private buildCustomTools(chatId: string, agentId: string, browserProfileId?: string): ToolDefinition[] {
     const customTools: ToolDefinition[] = [
       createBuiltinImageTool(),
       createMessageTool(chatId),
       ...createDocumentTools(chatId),
     ]
+    const mcpServers: Record<string, ToolDefinition[]> = {}
+
+    if (this.browserManager && browserProfileId) {
+      mcpServers['browser'] = createBrowserMcpServer({
+        browserManager: this.browserManager,
+        chatId,
+        agentId,
+        profileId: browserProfileId,
+      })
+      customTools.push(...mcpServers['browser'])
+      logBrowserToolRegistration(browserProfileId)
+    }
+
     if (this.skillsLoader) {
       customTools.push(createSkillTool(this.skillsLoader))
     }

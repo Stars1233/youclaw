@@ -13,6 +13,7 @@ import type { HooksManager } from './hooks.ts'
 import type { AgentRouter } from './router.ts'
 import type { SecretsManager } from './secrets.ts'
 import type { SkillsLoader } from '../skills/loader.ts'
+import type { BrowserManager } from '../browser/index.ts'
 import type { AgentConfig, AgentInstance } from './types.ts'
 import {
   DEFAULT_AGENT_YAML, GLOBAL_MEMORY_MD,
@@ -28,6 +29,7 @@ export class AgentManager {
   private secretsManager: SecretsManager | null
   private skillsLoader: SkillsLoader | null
   private memoryManager: MemoryManager | null
+  private browserManager: BrowserManager | null
 
   constructor(
     eventBus: EventBus,
@@ -37,6 +39,7 @@ export class AgentManager {
     secretsManager?: SecretsManager,
     skillsLoader?: SkillsLoader,
     memoryManager?: MemoryManager,
+    browserManager?: BrowserManager,
   ) {
     this.eventBus = eventBus
     this.promptBuilder = promptBuilder
@@ -45,6 +48,7 @@ export class AgentManager {
     this.secretsManager = secretsManager ?? null
     this.skillsLoader = skillsLoader ?? null
     this.memoryManager = memoryManager ?? null
+    this.browserManager = browserManager ?? null
   }
 
   /**
@@ -168,6 +172,7 @@ export class AgentManager {
           this.hooksManager ?? undefined,
           this.skillsLoader ?? undefined,
           this.memoryManager ?? undefined,
+          this.browserManager ?? undefined,
         )
 
         this.agents.set(config.id, {

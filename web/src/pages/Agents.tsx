@@ -164,7 +164,8 @@ export function Agents() {
     getAgentConfig(selected)
       .then((config) => {
         setSubAgents((config.agents as SubAgentsMap) ?? {})
-        setAgentBrowserProfile(config.browserProfile as string | undefined)
+        const browserConfig = config.browser as { defaultProfile?: string } | undefined
+        setAgentBrowserProfile(browserConfig?.defaultProfile ?? config.browserProfile as string | undefined)
         setAgentSkills(config.skills as string[] | undefined)
       })
       .catch(() => {
@@ -191,7 +192,14 @@ export function Agents() {
   const handleSaveBrowserProfile = async (profileId: string | undefined) => {
     if (!selected) return
     setAgentBrowserProfile(profileId)
-    await updateAgentConfig(selected, { browserProfile: profileId ?? null })
+    await updateAgentConfig(selected, {
+      browser: {
+        enabled: true,
+        allowChatOverride: true,
+        ...(profileId ? { defaultProfile: profileId } : {}),
+      },
+      browserProfile: null,
+    })
   }
 
   // Rename Agent
