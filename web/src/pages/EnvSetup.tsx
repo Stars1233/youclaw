@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button"
 import { installTool } from "@/api/client"
 import { isTauri, openExternal } from "@/api/transport"
 import logoUrl from "@/assets/logo.png"
-
-const GIT_DOWNLOAD_URL = "https://cdn.chat2db-ai.com/youclaw/website/Git-2.53.0.2-64-bit.exe.zip"
+import { GIT_DOWNLOAD_URL } from "@/config/tools"
 const COMPACT_SIZE = { width: 520, height: 720 }
 const DEFAULT_SIZE = { width: 1400, height: 900 }
 

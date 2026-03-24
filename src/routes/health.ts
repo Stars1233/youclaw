@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { z } from 'zod/v4'
 import { which, resetShellEnvCache, getShellEnv } from '../utils/shell-env.ts'
 import { getLogger } from '../logger/index.ts'
+import { BUN_CDN_BASE, BUN_GITHUB_BASE, GIT_CDN_URL } from '../config/tools.ts'
 
 const health = new Hono()
 
@@ -210,8 +211,6 @@ const installToolSchema = z.object({
   tool: z.enum(['bun', 'git', 'node']),
 })
 
-const BUN_CDN_BASE = 'https://cdn.chat2db-ai.com/youclaw/tools/bun'
-const BUN_GITHUB_BASE = 'https://github.com/oven-sh/bun/releases/download/bun-v1.2.15'
 
 /**
  * Get the Bun zip filename for the current platform.
@@ -334,7 +333,6 @@ async function installBun(): Promise<{ ok: boolean; stdout: string; stderr: stri
   }
 }
 
-const GIT_CDN_URL = 'https://cdn.chat2db-ai.com/youclaw/tools/git/Git-2.53.0.2-64-bit.exe.zip'
 
 /**
  * Download Git installer from CDN, extract, and run silent install on Windows.
