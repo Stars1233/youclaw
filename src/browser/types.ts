@@ -2,8 +2,8 @@ export type BrowserDriver = 'managed' | 'remote-cdp' | 'extension-relay'
 
 export type BrowserRuntimeStatus = 'starting' | 'running' | 'stopped' | 'error'
 
-export const DEFAULT_BROWSER_PROFILE_ID = 'openclaw'
-export const DEFAULT_BROWSER_PROFILE_NAME = 'OpenClaw'
+export const DEFAULT_BROWSER_PROFILE_ID = 'youclaw'
+export const DEFAULT_BROWSER_PROFILE_NAME = 'YouClaw'
 export const DEFAULT_CDP_PORT_START = 18800
 export const DEFAULT_CDP_PORT_END = 18899
 

@@ -17,10 +17,10 @@ describe('browser manager', () => {
     const manager = new BrowserManager()
     const profile = manager.ensureDefaultProfile()
 
-    expect(profile.id).toBe('openclaw')
+    expect(profile.id).toBe('youclaw')
     expect(profile.driver).toBe('managed')
     expect(profile.isDefault).toBe(true)
-    expect(profile.userDataDir?.endsWith('/browser-profiles/openclaw')).toBe(true)
+    expect(profile.userDataDir?.endsWith('/browser-profiles/youclaw')).toBe(true)
   })
 
   test('browser routes expose the new profile endpoints', async () => {
@@ -31,7 +31,7 @@ describe('browser manager', () => {
     const listRes = await app.request('/browser/profiles')
     expect(listRes.status).toBe(200)
     const listBody = await listRes.json() as Array<{ id: string }>
-    expect(listBody.some((profile) => profile.id === 'openclaw')).toBe(true)
+    expect(listBody.some((profile) => profile.id === 'youclaw')).toBe(true)
 
     const createRes = await app.request('/browser/profiles', {
       method: 'POST',
