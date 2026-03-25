@@ -300,11 +300,13 @@ export function Chat() {
                       : "translate-y-3 opacity-0",
                   )}
                 >
-                  <img
-                    src="/icon.svg"
-                    alt="YouClaw"
-                    className="h-24 w-24 mb-3 mx-auto transition-transform duration-300 ease-out hover:scale-110 hover:rotate-3"
-                  />
+                  <div className="mb-3 mx-auto w-fit pointer-events-auto">
+                    <img
+                      src="/icon.svg"
+                      alt="YouClaw"
+                      className="chat-welcome-mascot h-24 w-24"
+                    />
+                  </div>
                   <h1 className="text-2xl font-semibold tracking-tight">
                     {t.chat.welcome}
                   </h1>
