@@ -20,7 +20,7 @@ bun build:tauri      # Build Tauri desktop app
 - **Runtime**: Bun (backend sidecar + package manager)
 - **Desktop Shell**: Tauri 2 (Rust, window/tray/updater)
 - **Backend**: Hono (HTTP) + bun:sqlite (database) + Pino (logging)
-- **Agent**: @anthropic-ai/claude-agent-sdk
+- **Agent**: @mariozechner/pi-coding-agent + @mariozechner/pi-ai
 - **Frontend**: Vite + React + shadcn/ui + Tailwind CSS
 - **Validation**: Zod (v4, import from `zod/v4`)
 - **Scheduling**: croner (cron expression parser)
@@ -43,7 +43,7 @@ bun build:tauri      # Build Tauri desktop app
 
 ```
 src/
-├── agent/          # AgentManager (loads agent.yaml), AgentRuntime (claude-agent-sdk), AgentQueue (concurrency), PromptBuilder, SubagentTracker
+├── agent/          # AgentManager (loads agent.yaml), AgentRuntime (pi-coding-agent/pi-ai), AgentQueue (concurrency), PromptBuilder, SubagentTracker
 ├── channel/        # MessageRouter, TelegramChannel
 ├── config/         # env.ts (Zod env validation), paths.ts (path constants)
 ├── db/             # bun:sqlite init, message/chat/task CRUD
@@ -72,10 +72,10 @@ web/src/
 
 ## Environment Variables
 
-- `ANTHROPIC_API_KEY` (required)
+- `MODEL_API_KEY` (required)
 - `PORT` (default 62601)
 - `DATA_DIR` (default ./data)
-- `AGENT_MODEL` (default minimax/MiniMax-M2.7-highspeed)
+- `MODEL_PROVIDER` / `MODEL_ID` (default minimax / MiniMax-M2.7-highspeed)
 - `LOG_LEVEL` (debug/info/warn/error, default info)
 - `TELEGRAM_BOT_TOKEN` (optional, enables Telegram channel)
 

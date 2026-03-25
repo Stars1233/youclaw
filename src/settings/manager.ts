@@ -10,6 +10,13 @@ import {
 // Key in kv_state table
 const SETTINGS_KEY = 'settings'
 
+function resolveEnvModelRef(env: ReturnType<typeof getEnv>): string {
+  if (env.MODEL_PROVIDER === 'builtin') {
+    return env.MODEL_ID
+  }
+  return env.MODEL_ID.includes('/') ? env.MODEL_ID : `${env.MODEL_PROVIDER}/${env.MODEL_ID}`
+}
+
 /**
  * Read settings from kv_state, returning defaults if missing.
  */
@@ -70,29 +77,27 @@ export function isRegistrySourceSetting(value: unknown): value is Settings['defa
  */
 export function getActiveModelConfig(): { apiKey: string; baseUrl: string; modelId: string; provider: string } | null {
   const settings = getSettings()
+  const env = getEnv()
 
   if (settings.activeModel.provider === 'builtin' || settings.activeModel.provider === 'cloud') {
-    const env = getEnv()
     const builtinUrl = env.YOUCLAW_BUILTIN_API_URL
     const builtinToken = env.YOUCLAW_BUILTIN_AUTH_TOKEN
     if (builtinUrl && builtinToken) {
       return {
         apiKey: builtinToken,
         baseUrl: builtinUrl,
-        modelId: env.AGENT_MODEL,
+        modelId: resolveEnvModelRef(env),
         provider: 'builtin',
       }
     }
-    // Built-in model params not injected at compile time, fall back to .env config
-    if (env.ANTHROPIC_API_KEY) {
+    if (env.MODEL_API_KEY) {
       return {
-        apiKey: env.ANTHROPIC_API_KEY,
-        baseUrl: env.ANTHROPIC_BASE_URL || '',
-        modelId: env.AGENT_MODEL,
+        apiKey: env.MODEL_API_KEY,
+        baseUrl: env.MODEL_BASE_URL || '',
+        modelId: resolveEnvModelRef(env),
         provider: 'builtin',
       }
     }
-    // No config available at all, return null (agent features unavailable)
     return null
   }
 
@@ -155,10 +160,10 @@ function inferCustomModelProvider(model: CustomModel): CustomModel['provider'] {
 export function getBuiltinModelId(): string | null {
   const env = getEnv()
   if (env.YOUCLAW_BUILTIN_API_URL && env.YOUCLAW_BUILTIN_AUTH_TOKEN) {
-    return env.AGENT_MODEL
+    return resolveEnvModelRef(env)
   }
-  if (env.ANTHROPIC_API_KEY) {
-    return env.AGENT_MODEL
+  if (env.MODEL_API_KEY) {
+    return resolveEnvModelRef(env)
   }
   return null
 }

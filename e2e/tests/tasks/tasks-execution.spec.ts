@@ -10,7 +10,7 @@ test.describe('真实执行', () => {
   })
 
   test('真实手动执行 + 运行日志', async ({ page, request }) => {
-    // 检查是否有 ANTHROPIC_API_KEY
+    // 检查是否已配置模型 API key
     const healthRes = await request.get(`${API_BASE}/api/health`)
     if (!healthRes.ok()) {
       test.skip(true, 'Server not healthy, skip real execution test')

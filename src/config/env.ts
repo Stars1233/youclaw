@@ -6,15 +6,15 @@ import { BUILD_CONSTANTS } from './build-constants.ts'
 
 // Model-related keys: always read from .env file, ignoring user's system env vars
 const DOTENV_OVERRIDE_KEYS = new Set([
-  'ANTHROPIC_API_KEY',
-  'ANTHROPIC_AUTH_TOKEN', // Anthropic SDK compatible field, equivalent to ANTHROPIC_API_KEY
-  'ANTHROPIC_BASE_URL',
-  'AGENT_MODEL',
+  'MODEL_PROVIDER',
+  'MODEL_ID',
+  'MODEL_API_KEY',
+  'MODEL_BASE_URL',
 ])
 
 /**
  * Manually load .env file into process.env.
- * Model-related keys (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, AGENT_MODEL)
+ * Model-related keys (MODEL_PROVIDER, MODEL_ID, MODEL_API_KEY, MODEL_BASE_URL)
  * always override system env vars to avoid picking up user shell config.
  * Other keys do not override existing env vars.
  */
@@ -59,11 +59,12 @@ function loadDotEnv(): void {
 }
 
 const envSchema = z.object({
-  ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_BASE_URL: z.string().optional(),
+  MODEL_PROVIDER: z.string().default('minimax'),
+  MODEL_ID: z.string().default('MiniMax-M2.7-highspeed'),
+  MODEL_API_KEY: z.string().optional(),
+  MODEL_BASE_URL: z.string().optional(),
   PORT: z.coerce.number().default(62601),
   DATA_DIR: z.string().default('./data'),
-  AGENT_MODEL: z.string().default('minimax/MiniMax-M2.7-highspeed'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   FEISHU_APP_ID: z.string().optional(),
@@ -119,11 +120,6 @@ export function loadEnv(): EnvConfig {
     }
   }
 
-  // ANTHROPIC_AUTH_TOKEN is equivalent to ANTHROPIC_API_KEY, unify to ANTHROPIC_API_KEY
-  if (!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_AUTH_TOKEN) {
-    process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_AUTH_TOKEN
-  }
-
   // Build-time constant injection: build-sidecar.mjs generates build-constants.ts
   // with compile-time env vars as a plain JS object, merged into process.env here
   for (const [key, val] of Object.entries(BUILD_CONSTANTS)) {
@@ -143,8 +139,8 @@ export function loadEnv(): EnvConfig {
 
   _config = result.data
 
-  if (!_config.ANTHROPIC_API_KEY) {
-    console.warn('ANTHROPIC_API_KEY not set. Agent features will be unavailable. Please configure the API Key in settings.')
+  if (!_config.YOUCLAW_BUILTIN_AUTH_TOKEN && !_config.MODEL_API_KEY) {
+    console.warn('MODEL_API_KEY not set. Agent features will be unavailable unless built-in auth is configured.')
   }
 
   return _config

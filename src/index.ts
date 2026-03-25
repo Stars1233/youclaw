@@ -1,4 +1,4 @@
-// Remove CLAUDECODE env var to prevent Claude Agent SDK from detecting a nested session
+// Remove CLAUDECODE env var to prevent inherited Claude-specific session detection
 delete process.env.CLAUDECODE
 
 import { appendFileSync, mkdirSync } from 'node:fs'

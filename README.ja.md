@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Claude Agent SDK をベースにしたデスクトップ AI Assistant</strong>
+  <strong>マルチプロバイダー対応 coding agent runtime ベースのデスクトップ AI Assistant</strong>
 </p>
 
 <p align="center">
@@ -73,7 +73,7 @@
 | ランタイム / パッケージ管理 | [Bun](https://bun.sh/) |
 | デスクトップシェル | [Tauri 2](https://tauri.app/)（Rust） |
 | バックエンド | Hono + bun:sqlite + Pino |
-| Agent | `@anthropic-ai/claude-agent-sdk` |
+| Agent | `@mariozechner/pi-coding-agent` + `@mariozechner/pi-ai` |
 | フロントエンド | Vite + React + shadcn/ui + Tailwind CSS |
 | チャネル | grammY（Telegram）· `dingtalk-stream`（DingTalk）· `@larksuiteoapi/node-sdk`（Feishu）· QQ · WeCom |
 | スケジュールタスク | croner |
@@ -87,7 +87,7 @@
 │   ┌──────────────┐    ┌────────────────────────────┐ │
 │   │   WebView     │    │   Bun Sidecar              │ │
 │   │  Vite+React   │◄──►  Hono API Server           │ │
-│   │  shadcn/ui    │ HTTP│  Claude Agent SDK         │ │
+│   │  shadcn/ui    │ HTTP│  Multi-provider Agent RT  │ │
 │   │               │ SSE │  bun:sqlite               │ │
 │   └──────────────┘    └────────────────────────────┘ │
 └──────────────────────────────────────────────────────┘
@@ -125,7 +125,7 @@
 
 - [Bun](https://bun.sh/) >= 1.1
 - [Rust](https://rustup.rs/)（Tauri デスクトップアプリのビルドに必要）
-- [Anthropic API key](https://console.anthropic.com/) ひとつ
+- 使用するモデルプロバイダーの API key
 
 ### セットアップ
 
@@ -139,7 +139,7 @@ cd web && bun install && cd ..
 
 # 環境変数を設定
 cp .env.example .env
-# .env を編集して ANTHROPIC_API_KEY を設定
+# .env を編集して MODEL_API_KEY を設定
 ```
 
 ### Web モード
@@ -188,11 +188,12 @@ bun test:e2e:ui      # UI 付きで E2E テストを実行
 
 | 変数 | 必須 | デフォルト | 説明 |
 |------|------|------------|------|
-| `ANTHROPIC_API_KEY` | はい | — | Anthropic API key |
-| `ANTHROPIC_BASE_URL` | いいえ | — | カスタム API Base URL |
+| `MODEL_PROVIDER` | いいえ | `builtin` | デフォルトのモデルプロバイダーまたは実行モード |
+| `MODEL_ID` | いいえ | `minimax/MiniMax-M2.7-highspeed` | デフォルトのモデル参照 |
+| `MODEL_API_KEY` | はい | — | モデル API key |
+| `MODEL_BASE_URL` | いいえ | — | カスタムモデル API Base URL |
 | `PORT` | いいえ | `62601` | バックエンドサーバーポート |
 | `DATA_DIR` | いいえ | `./data` | データ保存ディレクトリ |
-| `AGENT_MODEL` | いいえ | `claude-sonnet-4-6` | デフォルトの Claude モデル |
 | `LOG_LEVEL` | いいえ | `info` | ログレベル |
 | `TELEGRAM_BOT_TOKEN` | いいえ | — | Telegram チャネルを有効化 |
 | `DINGTALK_CLIENT_ID` | いいえ | — | DingTalk アプリ Client ID |

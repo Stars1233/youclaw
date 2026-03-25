@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>基于 Claude Agent SDK 的桌面 AI Assistant</strong>
+  <strong>基于多供应商 coding agent runtime 的桌面 AI Assistant</strong>
 </p>
 
 <p align="center">
@@ -73,7 +73,7 @@
 | 运行时与包管理 | [Bun](https://bun.sh/) |
 | 桌面壳层 | [Tauri 2](https://tauri.app/)（Rust） |
 | 后端 | Hono + bun:sqlite + Pino |
-| Agent | `@anthropic-ai/claude-agent-sdk` |
+| Agent | `@mariozechner/pi-coding-agent` + `@mariozechner/pi-ai` |
 | 前端 | Vite + React + shadcn/ui + Tailwind CSS |
 | 渠道 | grammY（Telegram）· `dingtalk-stream`（钉钉）· `@larksuiteoapi/node-sdk`（飞书）· QQ · 企业微信 |
 | 定时任务 | croner |
@@ -87,7 +87,7 @@
 │   ┌──────────────┐    ┌────────────────────────────┐ │
 │   │   WebView     │    │   Bun Sidecar              │ │
 │   │  Vite+React   │◄──►  Hono API Server           │ │
-│   │  shadcn/ui    │ HTTP│  Claude Agent SDK         │ │
+│   │  shadcn/ui    │ HTTP│  多供应商 Agent Runtime   │ │
 │   │               │ SSE │  bun:sqlite               │ │
 │   └──────────────┘    └────────────────────────────┘ │
 └──────────────────────────────────────────────────────┘
@@ -125,7 +125,7 @@
 
 - [Bun](https://bun.sh/) >= 1.1
 - [Rust](https://rustup.rs/)（用于构建 Tauri 桌面应用）
-- 一个 [Anthropic API key](https://console.anthropic.com/)
+- 你所选模型供应商的 API key
 
 ### 安装与初始化
 
@@ -139,7 +139,7 @@ cd web && bun install && cd ..
 
 # 配置环境变量
 cp .env.example .env
-# 编辑 .env 并设置 ANTHROPIC_API_KEY
+# 编辑 .env 并设置 MODEL_API_KEY
 ```
 
 ### Web 模式
@@ -188,11 +188,12 @@ bun test:e2e:ui      # 以 UI 模式运行 E2E 测试
 
 | 变量 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
-| `ANTHROPIC_API_KEY` | 是 | — | Anthropic API key |
-| `ANTHROPIC_BASE_URL` | 否 | — | 自定义 API Base URL |
+| `MODEL_PROVIDER` | 否 | `builtin` | 默认模型供应商或运行模式 |
+| `MODEL_ID` | 否 | `minimax/MiniMax-M2.7-highspeed` | 默认模型引用 |
+| `MODEL_API_KEY` | 是 | — | 模型 API key |
+| `MODEL_BASE_URL` | 否 | — | 自定义模型 API Base URL |
 | `PORT` | 否 | `62601` | 后端服务端口 |
 | `DATA_DIR` | 否 | `./data` | 数据存储目录 |
-| `AGENT_MODEL` | 否 | `claude-sonnet-4-6` | 默认 Claude 模型 |
 | `LOG_LEVEL` | 否 | `info` | 日志级别 |
 | `TELEGRAM_BOT_TOKEN` | 否 | — | 启用 Telegram 渠道 |
 | `DINGTALK_CLIENT_ID` | 否 | — | 钉钉应用 Client ID |

@@ -19,6 +19,13 @@ export interface RuntimeModelResolution {
   error?: string
 }
 
+function resolveEnvModelRef(env: ReturnType<typeof getEnv>): string {
+  if (env.MODEL_PROVIDER === 'builtin') {
+    return env.MODEL_ID
+  }
+  return env.MODEL_ID.includes('/') ? env.MODEL_ID : `${env.MODEL_PROVIDER}/${env.MODEL_ID}`
+}
+
 function normalizeAgentModelOverride(modelId?: string | null): string | undefined {
   const trimmed = modelId?.trim()
   if (!trimmed) return undefined
@@ -33,7 +40,7 @@ function normalizeAgentModelOverride(modelId?: string | null): string | undefine
 
 function resolveBuiltinRuntimeModel(modelIdOverride?: string): RuntimeModelResolution {
   const env = getEnv()
-  const modelId = modelIdOverride?.trim() || env.AGENT_MODEL
+  const modelId = modelIdOverride?.trim() || resolveEnvModelRef(env)
 
   if (env.YOUCLAW_BUILTIN_API_URL && env.YOUCLAW_BUILTIN_AUTH_TOKEN) {
     return {
@@ -47,11 +54,11 @@ function resolveBuiltinRuntimeModel(modelIdOverride?: string): RuntimeModelResol
     }
   }
 
-  if (env.ANTHROPIC_API_KEY) {
+  if (env.MODEL_API_KEY) {
     return {
       config: {
-        apiKey: env.ANTHROPIC_API_KEY,
-        baseUrl: env.ANTHROPIC_BASE_URL || '',
+        apiKey: env.MODEL_API_KEY,
+        baseUrl: env.MODEL_BASE_URL || '',
         modelId,
         provider: 'builtin',
         source: 'builtin',

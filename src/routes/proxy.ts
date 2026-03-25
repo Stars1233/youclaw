@@ -5,7 +5,7 @@ import { getEnv } from '../config/index.ts'
 
 /**
  * Local proxy route: forwards SDK requests to cloud service with rdxtoken header.
- * In cloud mode ANTHROPIC_BASE_URL points to http://localhost:{port}/api/proxy.
+ * In cloud mode the built-in model endpoint points to http://localhost:{port}/api/proxy.
  * SDK calls /api/proxy/v1/messages -> forwarded to cloud /api/v1/messages.
  */
 export function createProxyRoutes() {
