@@ -60,6 +60,7 @@ export interface ChatState {
   timelineItems: TimelineItem[]
   streamingText: string
   isProcessing: boolean
+  ignoreLateAssistantEvents: boolean
   pendingToolUse: ToolUseItem[]
   documentStatuses: Record<string, { filename: string; status: 'parsing' | 'parsed' | 'failed'; error?: string }>
   chatStatus: 'submitted' | 'streaming' | 'ready' | 'error'
@@ -106,6 +107,7 @@ function defaultChatState(chatId: string): ChatState {
     timelineItems: [],
     streamingText: '',
     isProcessing: false,
+    ignoreLateAssistantEvents: false,
     pendingToolUse: [],
     documentStatuses: {},
     chatStatus: 'ready',
@@ -158,37 +160,48 @@ export const useChatStore = create<ChatStore>((set) => ({
   appendStreamText: (chatId, text) =>
     set((state) => ({
       chats: updateChat(state.chats, chatId, (chat) => ({
-        streamingText: chat.streamingText + text,
-        timelineItems: (() => {
-          const timestamp = new Date().toISOString()
-          const normalizedItems = chat.timelineItems.map((item) =>
-            item.kind === 'tool_use' && item.status === 'running'
-              ? { ...item, status: 'done' as const }
-              : item,
-          )
-          const lastItem = normalizedItems[normalizedItems.length - 1]
-
-          if (lastItem?.kind === 'assistant_stream') {
-            return [
-              ...normalizedItems.slice(0, -1),
-              {
-                ...lastItem,
-                content: lastItem.content + text,
-              },
-            ]
+        ...(() => {
+          if (!chat.isProcessing || chat.ignoreLateAssistantEvents) {
+            return {}
           }
 
-          return [
-            ...normalizedItems,
-            {
-              id: `assistant_stream:${timestamp}:${crypto.randomUUID()}`,
-              kind: 'assistant_stream',
-              content: text,
-              timestamp,
-            },
-          ]
+          // Ignore late deltas that arrive after a completed/error turn.
+          // The canonical full reply is already in `messages`, so rendering
+          // trailing stream chunks creates duplicate assistant bubbles.
+          return {
+            streamingText: chat.streamingText + text,
+            timelineItems: (() => {
+              const timestamp = new Date().toISOString()
+              const normalizedItems = chat.timelineItems.map((item) =>
+                item.kind === 'tool_use' && item.status === 'running'
+                  ? { ...item, status: 'done' as const }
+                  : item,
+              )
+              const lastItem = normalizedItems[normalizedItems.length - 1]
+
+              if (lastItem?.kind === 'assistant_stream') {
+                return [
+                  ...normalizedItems.slice(0, -1),
+                  {
+                    ...lastItem,
+                    content: lastItem.content + text,
+                  },
+                ]
+              }
+
+              return [
+                ...normalizedItems,
+                {
+                  id: `assistant_stream:${timestamp}:${crypto.randomUUID()}`,
+                  kind: 'assistant_stream',
+                  content: text,
+                  timestamp,
+                },
+              ]
+            })(),
+            chatStatus: chat.isProcessing ? 'streaming' : chat.chatStatus,
+          }
         })(),
-        chatStatus: chat.isProcessing ? 'streaming' : chat.chatStatus,
       })),
     })),
 
@@ -196,7 +209,11 @@ export const useChatStore = create<ChatStore>((set) => ({
     set((state) => ({
       chats: updateChat(state.chats, chatId, () => {
         if (isProcessing) {
-          return { isProcessing: true, chatStatus: 'submitted' as const }
+          return {
+            isProcessing: true,
+            ignoreLateAssistantEvents: false,
+            chatStatus: 'submitted' as const,
+          }
         }
         return {
           isProcessing: false,
@@ -210,6 +227,9 @@ export const useChatStore = create<ChatStore>((set) => ({
   addToolUse: (chatId, tool) =>
     set((state) => ({
       chats: updateChat(state.chats, chatId, (chat) => {
+        if (!chat.isProcessing || chat.ignoreLateAssistantEvents) {
+          return {}
+        }
         const timelineItems = chat.timelineItems.map((item) =>
           item.kind === 'tool_use' && item.status === 'running'
             ? { ...item, status: 'done' as const }
@@ -312,6 +332,7 @@ export const useChatStore = create<ChatStore>((set) => ({
           // live view matches a refreshed chat and avoids incomplete stream artifacts.
           timelineItems: buildTimelineFromMessages(messages),
           streamingText: '',
+          ignoreLateAssistantEvents: true,
           pendingToolUse: [],
         }
       }),
@@ -406,6 +427,7 @@ export const useChatStore = create<ChatStore>((set) => ({
             timelineItems: errorTimelineItems,
             streamingText: '',
             isProcessing: false,
+            ignoreLateAssistantEvents: true,
             pendingToolUse: [],
             chatStatus: 'error' as const,
             sseErrorHandled: true,

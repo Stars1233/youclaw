@@ -1,9 +1,11 @@
-import { createAgentSession, createCodingTools, SessionManager, AuthStorage } from '@mariozechner/pi-coding-agent'
+import { createAgentSession, createCodingTools, SessionManager, AuthStorage, DefaultResourceLoader, getAgentDir } from '@mariozechner/pi-coding-agent'
 import type { AgentSession, AgentSessionEvent, SessionEntry, ToolDefinition } from '@mariozechner/pi-coding-agent'
+import { randomUUID } from 'node:crypto'
 import { mkdirSync, existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { getEnv } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
+import { writeModelInvocationLog } from '../logger/model-invocation.ts'
 import { getMessages, getSessionEntry, saveSession } from '../db/index.ts'
 import type { EventBus } from '../events/index.ts'
 import { ErrorCode } from '../events/types.ts'
@@ -271,6 +273,7 @@ export class AgentRuntime {
     const env = getEnv()
     const abortController = new AbortController()
     abortRegistry.register(chatId, abortController)
+    const invocationId = randomUUID()
 
     const browserDisabled = browserProfileId === null
     const resolvedBrowserProfile = this.browserManager
@@ -282,9 +285,10 @@ export class AgentRuntime {
             ))
       : null
     const effectiveBrowserProfileId = resolvedBrowserProfile?.id
-    const skillsPrompt = this.skillsLoader
-      ? this.skillsLoader.buildPromptSnapshot(this.config, requestedSkills).prompt
-      : ''
+    const skillSnapshot = this.skillsLoader
+      ? this.skillsLoader.buildPromptSnapshot(this.config, requestedSkills)
+      : { prompt: '', skills: [] }
+    const skillsPrompt = skillSnapshot.prompt
     const memoryContext = this.memoryManager && this.config.memory?.enabled !== false
       ? this.memoryManager.getMemoryContext(agentId, {
           recentDays: this.config.memory?.recentDays,
@@ -345,6 +349,39 @@ export class AgentRuntime {
       tools.map((tool) => tool.name),
     )
     const customTools = this.filterConfiguredTools(customToolRuntime.tools)
+    let modelRound = 0
+    const pendingModelCalls: Array<{ round: number; startedAt: number }> = []
+    const resourceLoader = new DefaultResourceLoader({
+      cwd,
+      agentDir: getAgentDir(),
+      extensionFactories: [
+        (pi) => {
+          pi.on('before_provider_request', (event) => {
+            modelRound += 1
+            const round = modelRound
+            pendingModelCalls.push({ round, startedAt: Date.now() })
+            writeModelInvocationLog({
+              event: 'request',
+              invocationId,
+              round,
+              agentId,
+              chatId,
+              model: {
+                provider: model.provider,
+                modelId: model.id,
+                baseUrl: modelConfig.baseUrl || undefined,
+              },
+              session: {
+                resumed: Boolean(existingSessionFile && existsSync(existingSessionFile)),
+                sessionFile: existingSessionFile ?? sessionManager.getSessionFile() ?? null,
+              },
+              payload: event.payload,
+            })
+          })
+        },
+      ],
+    })
+    await resourceLoader.reload()
 
     logger.info({
       agentId,
@@ -365,6 +402,7 @@ export class AgentRuntime {
         model,
         tools,
         customTools,
+        resourceLoader,
         authStorage,
         sessionManager,
       })
@@ -379,6 +417,34 @@ export class AgentRuntime {
         this.handleSessionEvent(event, agentId, chatId, (text) => {
           fullText += text
         }, compactionSummaries, browserDisabled, browserDisabledNotice)
+
+        if (event.type === 'turn_end') {
+          const current = pendingModelCalls.shift()
+          if (!current) return
+          const responseText = this.extractAssistantText(event.message)
+          writeModelInvocationLog({
+            event: 'response',
+            invocationId,
+            round: current.round,
+            agentId,
+            chatId,
+            model: {
+              provider: model.provider,
+              modelId: model.id,
+              baseUrl: modelConfig.baseUrl || undefined,
+            },
+            session: {
+              resumed: Boolean(existingSessionFile && existsSync(existingSessionFile)),
+              sessionFile: session.sessionManager.getSessionFile() ?? existingSessionFile ?? null,
+            },
+            payload: event.message,
+            responseText,
+            result: {
+              durationMs: Date.now() - current.startedAt,
+              outputLength: responseText.length,
+            },
+          })
+        }
       })
 
       const promptWithFallback = (!existingSessionFile || !existsSync(existingSessionFile))
@@ -423,8 +489,62 @@ export class AgentRuntime {
             const finalSessionId = session.sessionManager.getSessionId()
             const finalSessionFile = session.sessionManager.getSessionFile() ?? null
             saveSession(agentId, chatId, finalSessionId, finalSessionFile)
+            const current = pendingModelCalls[0]
+            if (current) {
+              writeModelInvocationLog({
+                event: 'error',
+                invocationId,
+                round: current.round,
+                agentId,
+                chatId,
+                model: {
+                  provider: model.provider,
+                  modelId: model.id,
+                  baseUrl: modelConfig.baseUrl || undefined,
+                },
+                session: {
+                  resumed: Boolean(existingSessionFile && existsSync(existingSessionFile)),
+                  sessionFile: finalSessionFile,
+                },
+                result: {
+                  durationMs: Date.now() - current.startedAt,
+                  outputLength: fullText.length,
+                  sessionId: finalSessionId,
+                  sessionFile: finalSessionFile,
+                },
+                error: {
+                  message: 'aborted',
+                  partialOutput: fullText,
+                },
+              })
+            }
             return { fullText, sessionId: finalSessionId, sessionFile: finalSessionFile }
           }
+          const current = pendingModelCalls[0]
+          writeModelInvocationLog({
+            event: 'error',
+            invocationId,
+            round: current?.round,
+            agentId,
+            chatId,
+            model: {
+              provider: model.provider,
+              modelId: model.id,
+              baseUrl: modelConfig.baseUrl || undefined,
+            },
+            session: {
+              resumed: Boolean(existingSessionFile && existsSync(existingSessionFile)),
+              sessionFile: session.sessionManager.getSessionFile() ?? existingSessionFile ?? null,
+            },
+            result: {
+              durationMs: current ? Date.now() - current.startedAt : Date.now() - queryStartTime,
+              outputLength: fullText.length,
+            },
+            error: {
+              message: err instanceof Error ? err.message : String(err),
+              partialOutput: fullText,
+            },
+          })
           throw err
         }
 
@@ -793,6 +913,28 @@ export class AgentRuntime {
         data: attachment.data!,
         mimeType: attachment.mediaType,
       }))
+  }
+
+  private extractAssistantText(message: unknown): string {
+    if (!message || typeof message !== 'object') {
+      return ''
+    }
+
+    const content = (message as { content?: unknown }).content
+    if (!Array.isArray(content)) {
+      return ''
+    }
+
+    return content
+      .map((part) => {
+        if (!part || typeof part !== 'object') return ''
+        const typedPart = part as { type?: unknown; text?: unknown }
+        return typedPart.type === 'text' && typeof typedPart.text === 'string'
+          ? typedPart.text
+          : ''
+      })
+      .filter(Boolean)
+      .join('\n')
   }
 
   private emitProcessing(agentId: string, chatId: string, isProcessing: boolean): void {
