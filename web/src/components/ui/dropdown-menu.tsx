@@ -2,7 +2,12 @@ import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { cn } from "@/lib/utils"
 
-const DropdownMenu = DropdownMenuPrimitive.Root
+// Default modal=false to fix click-through issues in Tauri WebView2 on Windows.
+// Radix modal mode sets pointer-events:none on <body>, which WebView2 doesn't
+// always let the portal content override correctly.
+function DropdownMenu({ modal = false, ...props }: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Root>) {
+  return <DropdownMenuPrimitive.Root modal={modal} {...props} />
+}
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
 
