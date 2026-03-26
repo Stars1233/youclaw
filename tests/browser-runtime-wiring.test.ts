@@ -14,6 +14,8 @@ describe('browser runtime wiring', () => {
 
     expect(promptBuilder).toContain('mcp__browser__*')
     expect(promptBuilder).toContain('Prefer the built-in \\`mcp__browser__*\\` tools')
+    expect(promptBuilder).toContain('snapshot, act, screenshot, click, type, press_key, and close_tab')
+    expect(promptBuilder).toContain('prefer taking a fresh \\`snapshot\\` first and then using \\`act\\` with element refs')
     expect(promptBuilder).toContain('Use the legacy \\`agent-browser\\` skill only when you need capabilities not yet covered')
     expect(promptBuilder).toContain('agent-browser --session ${context.browserProfile.id} --profile ${context.browserProfile.userDataDir} <command>')
     expect(promptBuilder).toContain('Manual login is the default and recommended flow')
@@ -43,5 +45,16 @@ describe('browser runtime wiring', () => {
     expect(runtime).toContain('const browserDisabledNotice = { sent: false }')
     expect(runtime).toContain('buildDisabledBrowserUserMessage')
     expect(runtime).toContain('Browser automation is currently disabled for this request.')
+  })
+
+  test('browser MCP exposes ref-based snapshot and act tools', () => {
+    const mcp = read('src/browser/mcp.ts')
+    const runner = read('src/browser/playwright-runner.js')
+
+    expect(mcp).toContain("tool(\n        'snapshot'")
+    expect(mcp).toContain("tool(\n        'act'")
+    expect(mcp).toContain('Prefer this over raw CSS selectors')
+    expect(runner).toContain('data-youclaw-ref')
+    expect(runner).toContain('Ref ${input.ref} is not available. Capture a fresh snapshot first.')
   })
 })

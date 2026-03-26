@@ -6,6 +6,7 @@ import { getPaths } from '../config/index.ts'
 import { getLogger } from '../logger/index.ts'
 import type { BrowserManager } from './manager.ts'
 import {
+  actForChat,
   clickForChat,
   closeTabForChat,
   navigateForChat,
@@ -107,7 +108,7 @@ export function createBrowserMcpServer(params: {
       ),
       tool(
         'snapshot',
-        'Capture a lightweight text snapshot of the current tab.',
+        'Capture a text snapshot of the current tab and assign refs to visible interactive elements.',
         {},
         async () => {
           try {
@@ -121,6 +122,33 @@ export function createBrowserMcpServer(params: {
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
             return { content: [{ type: 'text' as const, text: `Failed to capture snapshot: ${msg}` }], isError: true }
+          }
+        },
+      ),
+      tool(
+        'act',
+        'Interact with a visible element ref from the latest browser snapshot. Prefer this over raw CSS selectors.',
+        {
+          ref: z.string().describe('Element ref returned by the latest browser snapshot'),
+          action: z.enum(['click', 'type', 'select', 'check', 'uncheck']).describe('Interaction to perform with the element ref'),
+          text: z.string().optional().describe('Required when action is type'),
+          option: z.string().optional().describe('Required when action is select; matches option label first, then value'),
+        },
+        async (args) => {
+          try {
+            const result = await actForChat(browserManager, {
+              chatId,
+              agentId,
+              profileId,
+              ref: args.ref,
+              action: args.action,
+              text: args.text,
+              option: args.option,
+            })
+            return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            return { content: [{ type: 'text' as const, text: `Failed to act on ref ${args.ref}: ${msg}` }], isError: true }
           }
         },
       ),
@@ -151,7 +179,7 @@ export function createBrowserMcpServer(params: {
       ),
       tool(
         'click',
-        'Click the first DOM element matching a CSS selector in the current tab.',
+        'Click the first DOM element matching a CSS selector in the current tab. Prefer snapshot + act when possible.',
         {
           selector: z.string().describe('CSS selector for the element to click'),
         },
@@ -167,7 +195,7 @@ export function createBrowserMcpServer(params: {
       ),
       tool(
         'type',
-        'Fill an input or textarea identified by a CSS selector in the current tab.',
+        'Fill an input or textarea identified by a CSS selector in the current tab. Prefer snapshot + act when possible.',
         {
           selector: z.string().describe('CSS selector for the input element'),
           text: z.string().describe('Text to enter into the field'),

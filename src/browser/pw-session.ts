@@ -12,11 +12,25 @@ type NodeAction =
   | 'open_tab'
   | 'navigate'
   | 'snapshot'
+  | 'act'
   | 'screenshot'
   | 'click'
   | 'type'
   | 'press_key'
   | 'close_tab'
+
+type RefAction = 'click' | 'type' | 'select' | 'check' | 'uncheck'
+
+type SnapshotRef = {
+  ref: string
+  tag: string
+  role?: string
+  type?: string
+  label?: string
+  text?: string
+  placeholder?: string
+  value?: string
+}
 
 type NodePayload = {
   endpoint: string
@@ -27,6 +41,9 @@ type NodePayload = {
   text?: string
   key?: string
   path?: string
+  ref?: string
+  interaction?: RefAction
+  option?: string
 }
 
 type NodeResult = {
@@ -35,6 +52,7 @@ type NodeResult = {
   text?: string
   path?: string
   closed?: boolean
+  refs?: SnapshotRef[]
 }
 
 function findNodeExecutable(): string {
@@ -199,6 +217,36 @@ export async function snapshotForChat(
     title: result.title ?? '',
     url: result.url ?? '',
     text: result.text ?? '',
+    refs: result.refs ?? [],
+  }
+}
+
+export async function actForChat(
+  browserManager: BrowserManager,
+  params: {
+    chatId: string
+    agentId: string
+    profileId: string
+    ref: string
+    action: RefAction
+    text?: string
+    option?: string
+  },
+): Promise<{ url: string; title: string }> {
+  const endpoint = await ensureEndpoint(browserManager, params.profileId)
+  const result = await runNodePlaywrightAction({
+    endpoint,
+    action: 'act',
+    ref: params.ref,
+    interaction: params.action,
+    text: params.text,
+    option: params.option,
+    activePageUrl: getActivePageUrl(params.chatId, params.profileId),
+  })
+  await persistChatPage(params.chatId, params.agentId, params.profileId, result)
+  return {
+    url: result.url ?? '',
+    title: result.title ?? '',
   }
 }
 
