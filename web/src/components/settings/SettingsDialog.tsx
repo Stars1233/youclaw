@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { GeneralPanel } from "./GeneralPanel"
 import { MarketplacePanel } from "./MarketplacePanel"
@@ -18,16 +18,18 @@ type Tab = "account" | "general" | "marketplace" | "models" | "channels" | "brow
 
 export type SettingsTab = Tab
 
+const CONTENT_PADDING_TABS: Tab[] = ["account", "general", "marketplace", "models", "environment", "invitation", "about"]
+
 interface SettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialTab?: Tab
+  allowedTabs?: Tab[]
 }
 
-export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, initialTab, allowedTabs }: SettingsDialogProps) {
   const { t } = useI18n()
   const cloudEnabled = useAppRuntimeStore((s) => s.cloudEnabled)
-  const [currentTab, setCurrentTab] = useState<Tab>(initialTab ?? (cloudEnabled ? "account" : "general"))
 
   const allTabs: { id: Tab; label: string; icon: React.ComponentType<{ size?: number }>; cloud?: boolean }[] = [
     { id: "account", label: t.account.title, icon: User, cloud: true },
@@ -42,7 +44,15 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
   ]
 
   // Hide cloud-dependent tabs in offline mode
-  const tabs = allTabs.filter((tab) => !tab.cloud || cloudEnabled)
+  const tabs = allTabs.filter((tab) => (!tab.cloud || cloudEnabled) && (!allowedTabs || allowedTabs.includes(tab.id)))
+  const fallbackTab = tabs[0]?.id ?? "general"
+  const defaultTab = initialTab && tabs.some((tab) => tab.id === initialTab) ? initialTab : fallbackTab
+  const [currentTab, setCurrentTab] = useState<Tab>(defaultTab)
+  const activeTab = tabs.some((tab) => tab.id === currentTab) ? currentTab : fallbackTab
+
+  useEffect(() => {
+    setCurrentTab(defaultTab)
+  }, [defaultTab, open])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,7 +72,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                 onClick={() => setCurrentTab(tab.id)}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                  currentTab === tab.id
+                  activeTab === tab.id
                     ? "bg-primary text-primary-foreground shadow-md"
                     : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                 )}
@@ -77,19 +87,19 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
         {/* Content area */}
         <div className={cn(
           "flex-1 overflow-hidden",
-          currentTab === "account" || currentTab === "general" || currentTab === "marketplace" || currentTab === "models" || currentTab === "environment" || currentTab === "invitation" || currentTab === "about"
+          CONTENT_PADDING_TABS.includes(activeTab)
             ? "p-8 overflow-y-auto"
             : ""
         )}>
-          {currentTab === "account" && <AccountPanel />}
-          {currentTab === "general" && <GeneralPanel />}
-          {currentTab === "marketplace" && <MarketplacePanel />}
-          {currentTab === "models" && <ModelsPanel />}
-          {currentTab === "channels" && <Channels />}
-          {currentTab === "browser" && <BrowserProfiles />}
-          {currentTab === "environment" && <EnvironmentPanel />}
-          {currentTab === "invitation" && <InvitationPanel />}
-          {currentTab === "about" && <AboutPanel />}
+          {activeTab === "account" && <AccountPanel />}
+          {activeTab === "general" && <GeneralPanel />}
+          {activeTab === "marketplace" && <MarketplacePanel />}
+          {activeTab === "models" && <ModelsPanel />}
+          {activeTab === "channels" && <Channels />}
+          {activeTab === "browser" && <BrowserProfiles />}
+          {activeTab === "environment" && <EnvironmentPanel />}
+          {activeTab === "invitation" && <InvitationPanel />}
+          {activeTab === "about" && <AboutPanel />}
         </div>
       </DialogContent>
     </Dialog>

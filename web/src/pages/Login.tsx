@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react"
 import { useI18n } from "@/i18n"
 import { useAppRuntimeStore } from "@/stores/app"
-import { LogIn, Loader2, Calendar, MessageSquare, ShieldCheck } from "lucide-react"
+import { LogIn, Loader2, Calendar, MessageSquare, ShieldCheck, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { isTauri } from "@/api/transport"
+import { SettingsDialog, type SettingsTab } from "@/components/settings/SettingsDialog"
 import logoUrl from "@/assets/logo.png"
 
+const LOGIN_SETTINGS_TABS: SettingsTab[] = ["general", "models", "environment", "about"]
+
 export function Login() {
-  const { t, locale, setLocale } = useI18n()
+  const { t } = useI18n()
   const { authLoading, login } = useAppRuntimeStore()
   const [version, setVersion] = useState("")
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     if (!isTauri) return
@@ -125,13 +129,16 @@ export function Login() {
             </div>
 
             <div className="pt-6 border-t border-border/50 text-center">
-              <button
+              <Button
                 type="button"
-                onClick={() => setLocale(locale === "en" ? "zh" : "en")}
-                className="px-4 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                variant="outline"
+                size="sm"
+                className="gap-2 rounded-xl"
+                onClick={() => setSettingsOpen(true)}
               >
-                {locale === "en" ? "中文" : "English"}
-              </button>
+                <Settings2 size={14} />
+                {t.settings.title}
+              </Button>
             </div>
           </div>
 
@@ -149,6 +156,14 @@ export function Login() {
           }
         `}</style>
       </div>
+      {settingsOpen && (
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          initialTab="general"
+          allowedTabs={LOGIN_SETTINGS_TABS}
+        />
+      )}
     </div>
   )
 }
