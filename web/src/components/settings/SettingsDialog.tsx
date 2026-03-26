@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { GeneralPanel } from "./GeneralPanel"
 import { MarketplacePanel } from "./MarketplacePanel"
@@ -49,10 +49,6 @@ export function SettingsDialog({ open, onOpenChange, initialTab, allowedTabs }: 
   const defaultTab = initialTab && tabs.some((tab) => tab.id === initialTab) ? initialTab : fallbackTab
   const [currentTab, setCurrentTab] = useState<Tab>(defaultTab)
   const activeTab = tabs.some((tab) => tab.id === currentTab) ? currentTab : fallbackTab
-
-  useEffect(() => {
-    setCurrentTab(defaultTab)
-  }, [defaultTab, open])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
