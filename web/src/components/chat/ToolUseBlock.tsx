@@ -25,7 +25,6 @@ const TOOL_META: Record<string, ToolMeta> = {
   Write:     { icon: Pencil, color: 'text-amber-500' },
   Edit:      { icon: Pencil, color: 'text-amber-500' },
   Bash:      { icon: Terminal, color: 'text-orange-500' },
-  Skill:     { icon: Zap, color: 'text-pink-500' },
 }
 
 const DEFAULT_META: ToolMeta = { icon: Wrench, color: 'text-muted-foreground' }
@@ -39,7 +38,6 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
   write: 'Write',
   edit: 'Edit',
   bash: 'Bash',
-  skill: 'Skill',
 }
 
 /** Resolve meta for MCP tools (mcp__<server>__<action>) by action keyword */
@@ -129,12 +127,6 @@ function getSummary(name: string, input?: string, isZh = false): Summary {
     case 'Grep': {
       const pattern = p?.pattern as string | undefined
       return pattern ? summarizeText(pattern, isZh ? '搜索内容' : 'Search contents') : { text: isZh ? '搜索内容' : 'Search contents' }
-    }
-    case 'Skill': {
-      const args = p?.args as string | undefined
-      const skill = p?.skill as string | undefined
-      if (args) return summarizeText(args, isZh ? '调用技能' : 'Run skill')
-      return skill ? summarizeText(skill, isZh ? '调用技能' : 'Run skill') : { text: isZh ? '调用技能' : 'Run skill' }
     }
     default: {
       // MCP tools: mcp__<server>__<action>

@@ -23,7 +23,6 @@ import { createBrowserMcpServer, logBrowserToolRegistration } from '../browser/i
 import type { SkillsLoader } from '../skills/loader.ts'
 import type { MemoryManager } from '../memory/index.ts'
 import { buildRecoveredConversationPrompt, resolveStoredSessionFile, type StoredSessionEntry } from './context-utils.ts'
-import { createSkillTool } from './tools/skill-tool.ts'
 import type { AgentConfig, ProcessParams } from './types.ts'
 import { clearBootstrapSnapshotOnSessionRollover } from './bootstrap-cache.ts'
 import type { SecretsManager } from './secrets.ts'
@@ -654,10 +653,6 @@ export class AgentRuntime {
     if (!input || typeof input !== 'object') return null
 
     const payload = input as Record<string, unknown>
-    if (toolName === 'Skill' && payload.skill === 'agent-browser') {
-      return 'If this task is blocked by login, CAPTCHA, or site verification, ask the user to switch the chat browser setting from "None" to a browser profile and retry.'
-    }
-
     if (toolName === 'Bash' && typeof payload.command === 'string' && /\bagent-browser\b/.test(payload.command)) {
       return 'If this task is blocked by login, CAPTCHA, or site verification, ask the user to switch the chat browser setting from "None" to a browser profile and retry.'
     }
@@ -843,10 +838,6 @@ export class AgentRuntime {
       logBrowserToolRegistration(browserProfileId)
     }
 
-    if (this.skillsLoader) {
-      customTools.push(createSkillTool(this.skillsLoader))
-    }
-
     if (this.config.mcpServers) {
       const resolvedServers = this.secretsManager
         ? this.secretsManager.injectToMcpEnv(agentId, this.config.mcpServers)
@@ -872,10 +863,6 @@ export class AgentRuntime {
       ? new Set(this.config.allowedTools.map((name) => this.normalizeToolName(name)))
       : null
     const disallowedTools = new Set((this.config.disallowedTools ?? []).map((name) => this.normalizeToolName(name)))
-
-    if (allowedTools) {
-      allowedTools.add(this.normalizeToolName('Skill'))
-    }
 
     return tools.filter((tool) => {
       const normalized = this.normalizeToolName(tool.name)
