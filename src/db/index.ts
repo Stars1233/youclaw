@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS messages (
   timestamp TEXT NOT NULL,
   is_from_me INTEGER DEFAULT 0,
   is_bot_message INTEGER DEFAULT 0,
+  tool_use_json TEXT,
+  session_id TEXT,
+  turn_id TEXT,
+  error_code TEXT,
   PRIMARY KEY (id, chat_id)
 );
 
@@ -195,6 +199,10 @@ export function initDatabase(): Database {
 
   // Migration: add attachments column
   try { _db.exec('ALTER TABLE messages ADD COLUMN attachments TEXT') } catch {}
+  try { _db.exec('ALTER TABLE messages ADD COLUMN tool_use_json TEXT') } catch {}
+  try { _db.exec('ALTER TABLE messages ADD COLUMN session_id TEXT') } catch {}
+  try { _db.exec('ALTER TABLE messages ADD COLUMN turn_id TEXT') } catch {}
+  try { _db.exec('ALTER TABLE messages ADD COLUMN error_code TEXT') } catch {}
 
   // Migration: add chat avatar column
   try { _db.exec('ALTER TABLE chats ADD COLUMN avatar TEXT') } catch {}
@@ -233,18 +241,42 @@ export function saveMessage(msg: {
   isFromMe: boolean
   isBotMessage: boolean
   attachments?: string
+  toolUse?: string
+  sessionId?: string
+  turnId?: string
+  errorCode?: string
 }) {
   const db = getDatabase()
   db.run(
-    `INSERT OR REPLACE INTO messages (id, chat_id, sender, sender_name, content, timestamp, is_from_me, is_bot_message, attachments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [msg.id, msg.chatId, msg.sender, msg.senderName, msg.content, msg.timestamp, msg.isFromMe ? 1 : 0, msg.isBotMessage ? 1 : 0, msg.attachments ?? null]
+    `INSERT OR REPLACE INTO messages (
+       id, chat_id, sender, sender_name, content, timestamp,
+       is_from_me, is_bot_message, attachments, tool_use_json,
+       session_id, turn_id, error_code
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      msg.id,
+      msg.chatId,
+      msg.sender,
+      msg.senderName,
+      msg.content,
+      msg.timestamp,
+      msg.isFromMe ? 1 : 0,
+      msg.isBotMessage ? 1 : 0,
+      msg.attachments ?? null,
+      msg.toolUse ?? null,
+      msg.sessionId ?? null,
+      msg.turnId ?? null,
+      msg.errorCode ?? null,
+    ]
   )
 }
 
 export function getMessages(chatId: string, limit = 50, before?: string): Array<{
   id: string; chat_id: string; sender: string; sender_name: string
-  content: string; timestamp: string; is_from_me: number; is_bot_message: number; attachments: string | null
+  content: string; timestamp: string; is_from_me: number; is_bot_message: number
+  attachments: string | null; tool_use_json: string | null; session_id: string | null
+  turn_id: string | null; error_code: string | null
 }> {
   const db = getDatabase()
   if (before) {

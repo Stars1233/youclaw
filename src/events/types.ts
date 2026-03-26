@@ -10,12 +10,12 @@ export enum ErrorCode {
 
 // Agent event types
 export type AgentEvent =
-  | { type: 'stream'; agentId: string; chatId: string; text: string }
-  | { type: 'tool_use'; agentId: string; chatId: string; tool: string; input?: string }
-  | { type: 'complete'; agentId: string; chatId: string; fullText: string; sessionId: string }
-  | { type: 'error'; agentId: string; chatId: string; error: string; errorCode?: ErrorCode }
-  | { type: 'processing'; agentId: string; chatId: string; isProcessing: boolean }
-  | { type: 'document_status'; agentId: string; chatId: string; documentId: string; filename: string; status: 'parsing' | 'parsed' | 'failed'; error?: string }
+  | { type: 'stream'; agentId: string; chatId: string; text: string; turnId?: string }
+  | { type: 'tool_use'; agentId: string; chatId: string; tool: string; input?: string; turnId?: string }
+  | { type: 'complete'; agentId: string; chatId: string; fullText: string; sessionId: string; turnId?: string }
+  | { type: 'error'; agentId: string; chatId: string; error: string; errorCode?: ErrorCode; turnId?: string }
+  | { type: 'processing'; agentId: string; chatId: string; isProcessing: boolean; turnId?: string }
+  | { type: 'document_status'; agentId: string; chatId: string; documentId: string; filename: string; status: 'parsing' | 'parsed' | 'failed'; error?: string; turnId?: string }
   // Phase 3: Sub-agent events
   | { type: 'subagent_started'; agentId: string; chatId: string; taskId: string; description: string }
   | { type: 'subagent_progress'; agentId: string; chatId: string; taskId: string; summary?: string }

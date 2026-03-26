@@ -87,7 +87,18 @@ describe('MessageRouter.handleInbound', () => {
   })
 
   test('auto-parses skill invocations, saves message, and records daily log', async () => {
-    const enqueue = mock(() => Promise.resolve('router reply'))
+    const eventBus = new EventBus()
+    const enqueue = mock(async () => {
+      eventBus.emit({
+        type: 'complete',
+        agentId: 'agent-1',
+        chatId: 'web:chat-1',
+        fullText: 'router reply',
+        sessionId: 'session-1',
+        turnId: 'msg-1',
+      })
+      return 'router reply'
+    })
     const appendDailyLog = mock(() => {})
     const loadAllSkills = mock(() => [
       { name: 'pdf', usable: true },
@@ -98,7 +109,7 @@ describe('MessageRouter.handleInbound', () => {
         resolveAgent: () => createManagedAgent(),
       } as any,
       { enqueue } as any,
-      new EventBus(),
+      eventBus,
       { appendDailyLog } as any,
       { loadAllSkills } as any,
     )
@@ -124,11 +135,53 @@ describe('MessageRouter.handleInbound', () => {
     const chats = getChats()
     const messages = getMessages('web:chat-1', 10)
     expect(chats.length).toBe(1)
-    expect(chats[0]?.name).toBe('Alice')
+    expect(chats[0]?.name).toBe('/pdf /agent-browser summarize report')
     expect(chats[0]?.channel).toBe('web')
     expect(messages.length).toBe(2)
     expect(messages.some((message) => message.content === '/pdf /agent-browser summarize report')).toBe(true)
     expect(messages.some((message) => message.content === 'router reply')).toBe(true)
+  })
+
+  test('persists tool use onto the final assistant message during complete events', async () => {
+    const eventBus = new EventBus()
+    const enqueue = mock(async () => {
+      eventBus.emit({
+        type: 'tool_use',
+        agentId: 'agent-1',
+        chatId: 'web:chat-1',
+        tool: 'Read',
+        input: '{"file_path":"report.md"}',
+        turnId: 'msg-1',
+      })
+      const messagesAfterComplete = (() => {
+        eventBus.emit({
+          type: 'complete',
+          agentId: 'agent-1',
+          chatId: 'web:chat-1',
+          fullText: 'done',
+          sessionId: 'session-1',
+          turnId: 'msg-1',
+        })
+        return getMessages('web:chat-1', 10)
+      })()
+      expect(messagesAfterComplete.some((message) => message.content === 'done')).toBe(true)
+      return 'done'
+    })
+    const router = new MessageRouter(
+      {
+        resolveAgent: () => createManagedAgent(),
+      } as any,
+      { enqueue } as any,
+      eventBus,
+    )
+
+    await router.handleInbound(createMessage())
+
+    const messages = getMessages('web:chat-1', 10)
+    const assistant = messages.find((message) => message.is_bot_message === 1)
+    expect(assistant?.turn_id).toBe('msg-1')
+    expect(assistant?.session_id).toBe('session-1')
+    expect(assistant?.tool_use_json).toContain('"name":"Read"')
   })
 
   test('explicit requestedSkills take priority, prefix is not re-parsed', async () => {

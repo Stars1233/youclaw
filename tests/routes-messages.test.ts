@@ -119,6 +119,46 @@ describe('messages routes', () => {
     expect(body.map((message) => message.content)).toEqual(['old', 'new'])
   })
 
+  test('GET /chats/:chatId/messages parses persisted tool use and turn metadata', async () => {
+    saveMessage({
+      id: 'm-tool',
+      chatId: 'chat-1',
+      sender: 'assistant',
+      senderName: 'Agent',
+      content: 'done',
+      timestamp: '2026-03-10T11:00:00.000Z',
+      isFromMe: true,
+      isBotMessage: true,
+      toolUse: JSON.stringify([{ id: 'tool-1', name: 'Read', input: '{"file_path":"a.md"}', status: 'done' }]),
+      sessionId: 'session-1',
+      turnId: 'turn-1',
+      errorCode: 'INSUFFICIENT_CREDITS',
+    })
+
+    const app = createMessagesRoutes(
+      { getAgent: () => ({ id: 'agent-1' }) } as any,
+      {} as any,
+      { handleInbound: mock(() => Promise.resolve()) } as any,
+    )
+
+    const res = await app.request('/chats/chat-1/messages')
+    const body = await res.json() as Array<{
+      content: string
+      toolUse: Array<{ name: string }>
+      sessionId: string
+      turnId: string
+      errorCode: string
+    }>
+
+    expect(body[0]?.content).toBe('done')
+    expect(body[0]?.toolUse).toEqual([
+      { id: 'tool-1', name: 'Read', input: '{"file_path":"a.md"}', status: 'done' },
+    ])
+    expect(body[0]?.sessionId).toBe('session-1')
+    expect(body[0]?.turnId).toBe('turn-1')
+    expect(body[0]?.errorCode).toBe('INSUFFICIENT_CREDITS')
+  })
+
   test('DELETE /chats/:chatId deletes chat and its messages', async () => {
     upsertChat('chat-1', 'agent-1', 'Chat 1')
     saveMessage({

@@ -19,6 +19,7 @@ export interface ProcessParams {
   chatId: string
   prompt: string
   agentId: string
+  turnId?: string
   requestedSkills?: string[]
   browserProfileId?: string | null
   attachments?: Array<{ filename: string; mediaType: string; filePath: string }>

@@ -154,6 +154,10 @@ export function createMessagesRoutes(agentManager: AgentManager, agentQueue: Age
     const parsed = msgs.map(m => ({
       ...m,
       attachments: m.attachments ? JSON.parse(m.attachments) : null,
+      toolUse: m.tool_use_json ? JSON.parse(m.tool_use_json) : null,
+      sessionId: m.session_id,
+      turnId: m.turn_id,
+      errorCode: m.error_code,
     }))
     return c.json(parsed.reverse())
   })

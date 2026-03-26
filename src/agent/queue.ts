@@ -5,6 +5,7 @@ interface QueueItem {
   agentId: string
   chatId: string
   prompt: string
+  turnId?: string
   requestedSkills?: string[]
   browserProfileId?: string | null
   attachments?: Array<{ filename: string; mediaType: string; filePath: string }>
@@ -34,11 +35,19 @@ export class AgentQueue {
   /**
    * Enqueue a message and return the agent's reply
    */
-  async enqueue(agentId: string, chatId: string, prompt: string, requestedSkills?: string[], browserProfileId?: string | null, attachments?: Array<{ filename: string; mediaType: string; filePath: string }>): Promise<string> {
+  async enqueue(
+    agentId: string,
+    chatId: string,
+    prompt: string,
+    requestedSkills?: string[],
+    browserProfileId?: string | null,
+    attachments?: Array<{ filename: string; mediaType: string; filePath: string }>,
+    turnId?: string,
+  ): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const chatKey = `${agentId}:${chatId}`
       const queue = this.chatQueues.get(chatKey) ?? []
-      queue.push({ agentId, chatId, prompt, requestedSkills, browserProfileId, attachments, resolve, reject })
+      queue.push({ agentId, chatId, prompt, turnId, requestedSkills, browserProfileId, attachments, resolve, reject })
       this.chatQueues.set(chatKey, queue)
 
       // Update agent state queueDepth
@@ -160,6 +169,7 @@ export class AgentQueue {
           chatId: item.chatId,
           prompt: item.prompt,
           agentId: item.agentId,
+          turnId: item.turnId,
           requestedSkills: item.requestedSkills,
           browserProfileId: item.browserProfileId,
           attachments: item.attachments,

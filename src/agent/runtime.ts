@@ -389,12 +389,12 @@ export class AgentRuntime {
    * Process a user message and return the agent's reply
    */
   async process(params: ProcessParams): Promise<string> {
-    const { chatId, prompt, agentId } = params
+    const { chatId, prompt, agentId, turnId } = params
     const logger = getLogger()
     const env = getEnv()
 
     // Notify processing started
-    this.emitProcessing(agentId, chatId, true)
+    this.emitProcessing(agentId, chatId, true, turnId)
 
     // on_session_start hook
     if (this.hooksManager) {
@@ -584,6 +584,7 @@ export class AgentRuntime {
         finalPrompt,
         agentId,
         chatId,
+        turnId,
         existingSessionId,
         model,
         params.requestedSkills,
@@ -622,6 +623,7 @@ export class AgentRuntime {
           chatId,
           fullText: finalText,
           sessionId,
+          turnId,
         })
       }
 
@@ -663,13 +665,14 @@ export class AgentRuntime {
         chatId,
         error: userError,
         errorCode,
+        turnId,
       })
 
       return `Error: ${userError}`
     } finally {
       // Clean up custom headers to prevent leaking between requests
       delete process.env.ANTHROPIC_CUSTOM_HEADERS
-      this.emitProcessing(agentId, chatId, false)
+      this.emitProcessing(agentId, chatId, false, turnId)
     }
   }
 
@@ -680,6 +683,7 @@ export class AgentRuntime {
     prompt: string,
     agentId: string,
     chatId: string,
+    turnId: string | undefined,
     existingSessionId: string | null,
     model: string,
     requestedSkills?: string[],
@@ -865,7 +869,7 @@ export class AgentRuntime {
       chatId,
       attachments,
       ({ documentId, filename, status, error }) => {
-        this.emitDocumentStatus(agentId, chatId, documentId, filename, status, error)
+        this.emitDocumentStatus(agentId, chatId, documentId, filename, status, error, turnId)
       },
     )
 
@@ -980,7 +984,7 @@ export class AgentRuntime {
           fullText += text
         }, (sid) => {
           sessionId = sid
-        }, browserDisabled, browserDisabledNotice)
+        }, turnId, browserDisabled, browserDisabledNotice)
       }
     } catch (err) {
       // User-initiated abort — return partial text gracefully instead of throwing
@@ -1063,6 +1067,7 @@ export class AgentRuntime {
     chatId: string,
     appendText: (text: string) => void,
     setSessionId: (sid: string) => void,
+    turnId: string | undefined,
     browserDisabled = false,
     browserDisabledNotice: { sent: boolean },
   ): Promise<void> {
@@ -1077,7 +1082,7 @@ export class AgentRuntime {
         for (const block of message.message.content) {
           if (block.type === 'text') {
             appendText(block.text)
-            this.emitStream(agentId, chatId, block.text)
+            this.emitStream(agentId, chatId, block.text, turnId)
           } else if (block.type === 'tool_use') {
             const disabledBrowserReason = this.getDisabledBrowserToolBlockReason(block.name, block.input, browserDisabled)
             if (disabledBrowserReason) {
@@ -1085,7 +1090,7 @@ export class AgentRuntime {
                 browserDisabledNotice.sent = true
                 const message = this.buildDisabledBrowserUserMessage(disabledBrowserReason)
                 appendText(message)
-                this.emitStream(agentId, chatId, message)
+                this.emitStream(agentId, chatId, message, turnId)
               }
               continue
             }
@@ -1098,7 +1103,7 @@ export class AgentRuntime {
                 payload: { tool: block.name, input: block.input },
               })
               if (preCtx.abort) {
-                this.emitStream(agentId, chatId, `\n[Tool ${block.name} blocked by hook: ${preCtx.abortReason ?? 'unknown reason'}]\n`)
+                this.emitStream(agentId, chatId, `\n[Tool ${block.name} blocked by hook: ${preCtx.abortReason ?? 'unknown reason'}]\n`, turnId)
                 continue
               }
             }
@@ -1109,7 +1114,7 @@ export class AgentRuntime {
               input: JSON.stringify(block.input).slice(0, 500),
               category: 'tool_use',
             }, `Tool call: ${block.name}`)
-            this.emitToolUse(agentId, chatId, block.name, block.input)
+            this.emitToolUse(agentId, chatId, block.name, block.input, turnId)
           }
         }
         break
@@ -1261,21 +1266,22 @@ export class AgentRuntime {
 
   // --- Emit helper methods ---
 
-  private emitProcessing(agentId: string, chatId: string, isProcessing: boolean): void {
-    this.eventBus.emit({ type: 'processing', agentId, chatId, isProcessing })
+  private emitProcessing(agentId: string, chatId: string, isProcessing: boolean, turnId?: string): void {
+    this.eventBus.emit({ type: 'processing', agentId, chatId, isProcessing, turnId })
   }
 
-  private emitStream(agentId: string, chatId: string, text: string): void {
-    this.eventBus.emit({ type: 'stream', agentId, chatId, text })
+  private emitStream(agentId: string, chatId: string, text: string, turnId?: string): void {
+    this.eventBus.emit({ type: 'stream', agentId, chatId, text, turnId })
   }
 
-  private emitToolUse(agentId: string, chatId: string, tool: string, input: unknown): void {
+  private emitToolUse(agentId: string, chatId: string, tool: string, input: unknown, turnId?: string): void {
     this.eventBus.emit({
       type: 'tool_use',
       agentId,
       chatId,
       tool,
       input: JSON.stringify(input).slice(0, 200),
+      turnId,
     })
   }
 
@@ -1286,6 +1292,7 @@ export class AgentRuntime {
     filename: string,
     status: 'parsing' | 'parsed' | 'failed',
     error?: string,
+    turnId?: string,
   ): void {
     this.eventBus.emit({
       type: 'document_status',
@@ -1295,6 +1302,7 @@ export class AgentRuntime {
       filename,
       status,
       error,
+      turnId,
     })
   }
 }
