@@ -92,7 +92,21 @@ export async function getChats() {
 
 // Get message history
 export async function getMessages(chatId: string) {
-  return apiFetch<Array<{ id: string; chat_id: string; sender: string; sender_name: string; content: string; timestamp: string; is_from_me: number; is_bot_message: number; attachments: Attachment[] | null }>>(`/api/chats/${encodeURIComponent(chatId)}/messages`)
+  return apiFetch<Array<{
+    id: string
+    chat_id: string
+    sender: string
+    sender_name: string
+    content: string
+    timestamp: string
+    is_from_me: number
+    is_bot_message: number
+    attachments: Attachment[] | null
+    toolUse: Array<{ id: string; name: string; input?: string; status: 'running' | 'done' }> | null
+    sessionId: string | null
+    turnId: string | null
+    errorCode: string | null
+  }>>(`/api/chats/${encodeURIComponent(chatId)}/messages`)
 }
 
 // Abort a running chat query

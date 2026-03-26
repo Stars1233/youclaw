@@ -126,9 +126,13 @@ export function useChatActions(agentId: string) {
           : ('user' as const),
         content: m.content,
         timestamp: m.timestamp,
+        toolUse: m.toolUse ?? undefined,
         attachments:
           (m as { attachments?: Attachment[] | null }).attachments ??
           undefined,
+        errorCode: m.errorCode ?? undefined,
+        sessionId: m.sessionId ?? undefined,
+        turnId: m.turnId ?? undefined,
       })),
     )
   }, [])

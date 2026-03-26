@@ -8,6 +8,7 @@ type SSEEvent = {
   type: string
   agentId: string
   chatId: string
+  turnId?: string
   documentId?: string
   filename?: string
   status?: 'parsing' | 'parsed' | 'failed'
@@ -165,20 +166,7 @@ class SSEManager {
         const msgs = await getMessages(chatId)
         const lastMsg = msgs[msgs.length - 1]
         if (lastMsg && lastMsg.is_bot_message) {
-          store.setMessages(
-            chatId,
-            msgs.map((m) => ({
-              id: m.id,
-              role: m.is_bot_message
-                ? ('assistant' as const)
-                : ('user' as const),
-              content: m.content,
-              timestamp: m.timestamp,
-              attachments:
-                (m as { attachments?: Attachment[] | null }).attachments ??
-                undefined,
-            })),
-          )
+          this.mapApiMessages(chatId, msgs)
           store.setProcessing(chatId, false)
           this.disconnect(chatId)
         }
@@ -214,6 +202,41 @@ class SSEManager {
     return this.connections.has(chatId)
   }
 
+  private mapApiMessages(chatId: string, messages: Awaited<ReturnType<typeof getMessages>>) {
+    const store = useChatStore.getState()
+    store.setMessages(
+      chatId,
+      messages.map((m) => ({
+        id: m.id,
+        role: m.is_bot_message
+          ? ('assistant' as const)
+          : ('user' as const),
+        content: m.content,
+        timestamp: m.timestamp,
+        toolUse: m.toolUse ?? undefined,
+        attachments:
+          (m as { attachments?: Attachment[] | null }).attachments ??
+          undefined,
+        errorCode: m.errorCode ?? undefined,
+        sessionId: m.sessionId ?? undefined,
+        turnId: m.turnId ?? undefined,
+      })),
+    )
+  }
+
+  private async finalizeChat(chatId: string): Promise<void> {
+    try {
+      const msgs = await getMessages(chatId)
+      this.mapApiMessages(chatId, msgs)
+    } catch {
+      // Keep local state if the final sync fails.
+    } finally {
+      const store = useChatStore.getState()
+      store.setProcessing(chatId, false)
+      this.disconnect(chatId)
+    }
+  }
+
   private handleSSEEvent(chatId: string, event: SSEEvent): void {
     const store = useChatStore.getState()
     switch (event.type) {
@@ -241,19 +264,19 @@ class SSEManager {
           ...t,
           status: 'done' as const,
         }))
-        store.completeMessage(chatId, event.fullText ?? '', finalToolUse, event.sessionId)
+        store.completeMessage(chatId, event.fullText ?? '', finalToolUse, event.sessionId, event.turnId)
         break
       }
       case 'processing':
-        store.setProcessing(chatId, event.isProcessing ?? false)
         if (!event.isProcessing) {
-          this.disconnect(chatId)
+          void this.finalizeChat(chatId)
+          break
         }
+        store.setProcessing(chatId, true)
         break
       case 'error':
         store.markSseErrorHandled(chatId)
         store.handleError(chatId, event.error ?? '', event.errorCode)
-        this.disconnect(chatId)
         break
     }
   }

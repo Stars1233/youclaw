@@ -72,6 +72,21 @@ describe('chat store completion flow', () => {
     expect(after2?.messages).toHaveLength(1)
   })
 
+  test('completeMessage prefers turnId for deduplication', () => {
+    const store = useChatStore.getState()
+
+    store.initChat('chat-1')
+    store.setProcessing('chat-1', true)
+
+    store.completeMessage('chat-1', 'reply text', [], 'session-abc', 'turn-1')
+    store.completeMessage('chat-1', 'reply text', [], 'session-def', 'turn-1')
+
+    const chat = useChatStore.getState().chats['chat-1']
+    expect(chat?.messages).toHaveLength(1)
+    expect(chat?.messages[0]?.turnId).toBe('turn-1')
+    expect(chat?.messages[0]?.sessionId).toBe('session-abc')
+  })
+
   test('completeMessage without sessionId does not deduplicate', () => {
     const store = useChatStore.getState()
 

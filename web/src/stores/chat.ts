@@ -52,6 +52,7 @@ export type Message = {
   attachments?: Attachment[]
   errorCode?: string
   sessionId?: string
+  turnId?: string
 }
 
 export interface ChatState {
@@ -99,6 +100,50 @@ function buildTimelineFromMessages(messages: Message[]): TimelineItem[] {
   return messages.map(messageToTimelineItem)
 }
 
+function getDocumentTimelineItems(items: TimelineItem[]): Array<Extract<TimelineItem, { kind: 'document_status' }>> {
+  return items.filter((item): item is Extract<TimelineItem, { kind: 'document_status' }> => item.kind === 'document_status')
+}
+
+function getLiveTimelineTail(items: TimelineItem[], messages: Message[]): TimelineItem[] {
+  const persistedMessageIds = new Set(messages.map((message) => `message:${message.id}`))
+  let tailStart = items.length
+
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i]
+    if (item?.kind === 'message' && !persistedMessageIds.has(item.id)) {
+      tailStart = i
+      break
+    }
+  }
+
+  if (tailStart === items.length) {
+    const lastPersistedMessageId = messages[messages.length - 1]?.id
+    if (!lastPersistedMessageId) {
+      tailStart = 0
+    } else {
+      for (let i = items.length - 1; i >= 0; i -= 1) {
+        const item = items[i]
+        if (item?.kind === 'message' && item.id === `message:${lastPersistedMessageId}`) {
+          tailStart = i + 1
+          break
+        }
+      }
+    }
+  }
+
+  return items.slice(tailStart).filter((item) => item.kind !== 'document_status')
+}
+
+function buildMergedTimeline(
+  messages: Message[],
+  existingTimelineItems: TimelineItem[],
+  preserveLiveTail: boolean,
+): TimelineItem[] {
+  const documentItems = getDocumentTimelineItems(existingTimelineItems)
+  const liveItems = preserveLiveTail ? getLiveTimelineTail(existingTimelineItems, messages) : []
+  return [...buildTimelineFromMessages(messages), ...documentItems, ...liveItems]
+}
+
 function defaultChatState(chatId: string): ChatState {
   return {
     chatId,
@@ -134,7 +179,7 @@ interface ChatStore {
   setProcessing(chatId: string, isProcessing: boolean): void
   addToolUse(chatId: string, tool: ToolUseItem): void
   setDocumentStatus(chatId: string, documentId: string, filename: string, status: 'parsing' | 'parsed' | 'failed', error?: string): void
-  completeMessage(chatId: string, fullText: string, toolUse: ToolUseItem[], sessionId?: string): void
+  completeMessage(chatId: string, fullText: string, toolUse: ToolUseItem[], sessionId?: string, turnId?: string): void
   addUserMessage(chatId: string, message: Message): void
   setMessages(chatId: string, messages: Message[]): void
   handleError(chatId: string, error: string, errorCode?: string): void
@@ -288,37 +333,46 @@ export const useChatStore = create<ChatStore>((set) => ({
       }),
     })),
 
-  completeMessage: (chatId, fullText, toolUse, sessionId) => {
+  completeMessage: (chatId, fullText, toolUse, sessionId, turnId) => {
     set((state) => ({
       chats: updateChat(state.chats, chatId, (chat) => {
-        // Idempotency: skip if a message with this sessionId already exists
-        if (sessionId && chat.messages.some(m => m.sessionId === sessionId)) {
+        // Prefer turnId for per-turn deduplication; sessionId is a fallback.
+        if (turnId && chat.messages.some((m) => m.turnId === turnId)) {
+          return {}
+        }
+        if (!turnId && sessionId && chat.messages.some((m) => m.sessionId === sessionId)) {
           return {}
         }
         const timestamp = new Date().toISOString()
         const nextMessage: Message = {
-          id: sessionId ?? Date.now().toString(),
+          id: turnId ?? sessionId ?? Date.now().toString(),
           role: 'assistant' as const,
           content: fullText,
           timestamp,
           toolUse: toolUse.length > 0 ? toolUse : undefined,
           sessionId,
+          turnId,
         }
-        const hasLiveAssistantText = chat.streamingText.trim().length > 0
-        const timelineItems = chat.timelineItems.map((item) =>
-          item.kind === 'tool_use' && item.status === 'running'
-            ? { ...item, status: 'done' as const }
-            : item,
-        )
-
-        if (!hasLiveAssistantText && fullText.trim()) {
-          timelineItems.push({
-            id: `assistant_stream:${timestamp}:${crypto.randomUUID()}`,
-            kind: 'assistant_stream',
-            content: fullText,
-            timestamp,
-          })
-        }
+        const currentTurnStartIndex = (() => {
+          for (let i = chat.timelineItems.length - 1; i >= 0; i -= 1) {
+            if (chat.timelineItems[i]?.kind === 'message') {
+              return i
+            }
+          }
+          return -1
+        })()
+        const baseTimelineItems = currentTurnStartIndex >= 0
+          ? chat.timelineItems.slice(0, currentTurnStartIndex + 1)
+          : buildTimelineFromMessages(chat.messages)
+        const currentTurnDocumentItems = (currentTurnStartIndex >= 0
+          ? chat.timelineItems.slice(currentTurnStartIndex + 1)
+          : []
+        ).filter((item): item is Extract<TimelineItem, { kind: 'document_status' }> => item.kind === 'document_status')
+        const timelineItems = [
+          ...baseTimelineItems,
+          ...currentTurnDocumentItems,
+          messageToTimelineItem(nextMessage),
+        ]
 
         return {
           messages: [...chat.messages, nextMessage],
@@ -358,7 +412,11 @@ export const useChatStore = create<ChatStore>((set) => ({
     set((state) => ({
       chats: updateChat(state.chats, chatId, () => ({
         messages,
-        timelineItems: buildTimelineFromMessages(messages),
+        timelineItems: buildMergedTimeline(
+          messages,
+          state.chats[chatId]?.timelineItems ?? [],
+          state.chats[chatId]?.isProcessing ?? false,
+        ),
       })),
     })),
 
@@ -398,7 +456,7 @@ export const useChatStore = create<ChatStore>((set) => ({
         ]
       }
 
-      const errorTimelineItems = buildTimelineFromMessages(messages)
+      const errorTimelineItems = buildMergedTimeline(messages, chat.timelineItems, false)
 
       // Reset error status after 2 seconds
       setTimeout(() => {
