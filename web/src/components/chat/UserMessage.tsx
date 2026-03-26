@@ -55,6 +55,7 @@ function UserAvatar() {
 export function UserMessage({ message }: { message: Message }) {
   const attachments = message.attachments ?? [];
   const formattedContent = formatUserMessageForDisplay(message.content);
+  const hasContent = formattedContent.trim().length > 0;
 
   return (
     <AIMessage from="user" data-testid="message-user">
@@ -72,27 +73,8 @@ export function UserMessage({ message }: { message: Message }) {
               })}
             </span>
           </div>
-          <div className="w-fit max-w-full overflow-hidden rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-primary-foreground">
-            <MessageResponse
-              className={cn(
-                "text-sm leading-relaxed text-primary-foreground [overflow-wrap:anywhere]",
-                "[&_p]:my-0 [&_p]:[overflow-wrap:anywhere]",
-                "[&_ul]:my-0 [&_ul]:space-y-1 [&_ul]:pl-5 [&_ul]:marker:text-primary-foreground/80",
-                "[&_ol]:my-0 [&_ol]:space-y-1 [&_ol]:pl-5 [&_ol]:marker:text-primary-foreground/80",
-                "[&_li]:py-0.5 [&_li]:[overflow-wrap:anywhere]",
-                "[&_hr]:my-3 [&_hr]:border-primary-foreground/25",
-                "[&_a]:text-primary-foreground [&_a]:underline [&_a]:underline-offset-4",
-                "[&_code]:rounded-md [&_code]:bg-black/10 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.95em]",
-                "[&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-black/10 [&_pre]:p-3",
-                "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
-                "[&_blockquote]:border-l-2 [&_blockquote]:border-primary-foreground/20 [&_blockquote]:pl-3 [&_blockquote]:text-primary-foreground/90"
-              )}
-            >
-              {formattedContent}
-            </MessageResponse>
-          </div>
           {attachments.length > 0 && (
-            <Attachments variant="grid" className="mt-2 ml-0">
+            <Attachments variant="grid" className="mb-2 ml-0">
               {attachments.map((a, i) => {
                 // Support both old format (data: base64) and new format (filePath)
                 const url =
@@ -119,6 +101,27 @@ export function UserMessage({ message }: { message: Message }) {
                 );
               })}
             </Attachments>
+          )}
+          {hasContent && (
+            <div className="w-fit max-w-full overflow-hidden rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-primary-foreground">
+              <MessageResponse
+                className={cn(
+                  "text-sm leading-relaxed text-primary-foreground [overflow-wrap:anywhere]",
+                  "[&_p]:my-0 [&_p]:[overflow-wrap:anywhere]",
+                  "[&_ul]:my-0 [&_ul]:space-y-1 [&_ul]:pl-5 [&_ul]:marker:text-primary-foreground/80",
+                  "[&_ol]:my-0 [&_ol]:space-y-1 [&_ol]:pl-5 [&_ol]:marker:text-primary-foreground/80",
+                  "[&_li]:py-0.5 [&_li]:[overflow-wrap:anywhere]",
+                  "[&_hr]:my-3 [&_hr]:border-primary-foreground/25",
+                  "[&_a]:text-primary-foreground [&_a]:underline [&_a]:underline-offset-4",
+                  "[&_code]:rounded-md [&_code]:bg-black/10 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.95em]",
+                  "[&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-black/10 [&_pre]:p-3",
+                  "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
+                  "[&_blockquote]:border-l-2 [&_blockquote]:border-primary-foreground/20 [&_blockquote]:pl-3 [&_blockquote]:text-primary-foreground/90"
+                )}
+              >
+                {formattedContent}
+              </MessageResponse>
+            </div>
           )}
         </div>
       </div>
