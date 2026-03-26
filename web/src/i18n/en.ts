@@ -611,6 +611,7 @@ export const en = {
     title: 'Environment Setup Required',
     description: 'Some required tools are missing. Please install them to continue.',
     detecting: 'Checking environment...',
+    detectingIdle: 'Will auto-detect after installation',
     detected: 'All dependencies ready! Loading...',
     copyCommand: 'Copy command',
     copied: 'Copied!',

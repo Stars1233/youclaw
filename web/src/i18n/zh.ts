@@ -613,6 +613,7 @@ export const zh: Translations = {
     title: '需要配置环境',
     description: '缺少必要的工具，请安装后继续使用。',
     detecting: '正在检测环境...',
+    detectingIdle: '安装完成后将自动检测',
     detected: '环境就绪！正在加载...',
     copyCommand: '复制命令',
     copied: '已复制！',

@@ -124,6 +124,7 @@ export function EnvSetup({ dependencies }: EnvSetupProps) {
   const recheckEnv = useAppStore((s) => s.recheckEnv)
   const envReady = useAppStore((s) => s.envReady)
   const [detected, setDetected] = useState(false)
+  const [isChecking, setIsChecking] = useState(false)
   const isWindows = navigator.userAgent.includes("Windows")
 
   // Filter to only missing required dependencies
@@ -139,13 +140,17 @@ export function EnvSetup({ dependencies }: EnvSetupProps) {
     if (envReady) return
 
     const interval = setInterval(async () => {
-      const ready = await recheckEnv()
-      if (ready) {
-        setDetected(true)
-        clearInterval(interval)
-        // Restore default window size
-        await resizeWindow(DEFAULT_SIZE.width, DEFAULT_SIZE.height)
-        await restoreMinSize()
+      setIsChecking(true)
+      try {
+        const ready = await recheckEnv()
+        if (ready) {
+          setDetected(true)
+          clearInterval(interval)
+          await resizeWindow(DEFAULT_SIZE.width, DEFAULT_SIZE.height)
+          await restoreMinSize()
+        }
+      } finally {
+        setIsChecking(false)
       }
     }, 3000)
 
@@ -210,13 +215,17 @@ export function EnvSetup({ dependencies }: EnvSetupProps) {
                     {t.envSetup.detected}
                   </span>
                 </>
-              ) : (
+              ) : isChecking ? (
                 <>
                   <Loader2 size={16} className="animate-spin text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
                     {t.envSetup.detecting}
                   </span>
                 </>
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  {t.envSetup.detectingIdle}
+                </span>
               )}
             </div>
           </div>
