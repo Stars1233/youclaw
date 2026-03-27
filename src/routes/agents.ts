@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
-import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { getPaths } from '../config/index.ts'
 import type { AgentManager } from '../agent/index.ts'
 import { EDITABLE_WORKSPACE_DOCS } from '../agent/index.ts'
 import { ensureAgentWorkspace } from '../agent/workspace.ts'
+import { DEFAULT_BROWSER_PROFILE_ID } from '../browser/index.ts'
 
 const ALLOWED_DOCS = [...EDITABLE_WORKSPACE_DOCS, 'MEMORY.md'] as const
 type AllowedDoc = (typeof ALLOWED_DOCS)[number]
@@ -178,6 +179,9 @@ export function createAgentsRoutes(agentManager: AgentManager) {
     const config: Record<string, unknown> = {
       id,
       name: body.name,
+      browser: {
+        defaultProfile: DEFAULT_BROWSER_PROFILE_ID,
+      },
       memory: {
         enabled: true,
       },

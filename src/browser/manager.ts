@@ -481,8 +481,9 @@ export class BrowserManager {
 
     const updatedAgents: string[] = []
     for (const agent of this.agentManager.getAgents()) {
-      const configuredProfileId = agent.browser?.defaultProfile ?? agent.browserProfile
-      if (configuredProfileId === profileId) {
+      const matchesLegacy = agent.browserProfile === profileId
+      const matchesStructured = agent.browser?.defaultProfile === profileId
+      if (matchesLegacy || matchesStructured) {
         updatedAgents.push(agent.id)
       }
     }

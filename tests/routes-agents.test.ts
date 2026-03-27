@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { parse as parseYaml } from 'yaml'
@@ -146,6 +146,11 @@ describe('agents routes', () => {
     expect(existsSync(resolve(agentDir, 'AGENTS.md'))).toBe(true)
     expect(existsSync(resolve(agentDir, 'SOUL.md'))).toBe(true)
     expect(manager.getAgent(agentId)?.config.name).toBe('Route Create Agent')
+    expect(manager.getAgent(agentId)?.config.browser?.defaultProfile).toBe('youclaw')
+
+    const yaml = parseYaml(readFileSync(resolve(agentDir, 'agent.yaml'), 'utf-8')) as Record<string, unknown>
+    const browser = yaml.browser as Record<string, unknown> | undefined
+    expect(browser?.defaultProfile).toBe('youclaw')
   })
 
   test('PUT /agents/:id updates agent.yaml but does not change id', async () => {
@@ -432,6 +437,7 @@ describe('agents routes', () => {
     expect(yamlContent.name).toBe('Structure Agent')
     expect(yamlContent.model).toBe('claude-sonnet-4-6')
     expect(yamlContent.skills).toEqual([])
+    expect((yamlContent.browser as Record<string, unknown> | undefined)?.defaultProfile).toBe('youclaw')
 
     // Verify all workspace docs are created
     expect(existsSync(resolve(agentDir, 'AGENTS.md'))).toBe(true)
