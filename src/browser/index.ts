@@ -4,6 +4,7 @@ export { createBrowserMcpServer, logBrowserToolRegistration } from './mcp.ts'
 export { createBrowserActionRouter } from './router.ts'
 export { detectInstalledBrowsers } from './detect.ts'
 export { buildBrowserMainBridgeState } from './main-bridge.ts'
+export { getBrowserExtensionPackageInfo, buildBrowserExtensionZip, resolveBrowserExtensionDirectory } from './extension-package.ts'
 export { disconnectAllBrowserSessions } from './pw-session.ts'
 export {
   createBrowserProfile,

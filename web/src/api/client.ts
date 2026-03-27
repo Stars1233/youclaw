@@ -882,6 +882,15 @@ export interface BrowserDiscoveryDTO {
   recommendationSource: 'env' | 'priority' | 'none'
 }
 
+export interface BrowserExtensionPackageDTO {
+  name: string
+  version: string
+  directoryPath: string
+  installMode: 'unpacked'
+  supportedBrowsers: BrowserDiscoveryEntryDTO['kind'][]
+  files: string[]
+}
+
 export interface BrowserMainBridgeDTO {
   profileId: string
   selectedBrowserId: string | null
@@ -916,6 +925,10 @@ export async function getBrowserProfiles() {
 
 export async function getBrowserDiscovery() {
   return apiFetch<BrowserDiscoveryDTO>('/api/browser/discovery')
+}
+
+export async function getBrowserMainBridgeExtensionPackage() {
+  return apiFetch<BrowserExtensionPackageDTO>('/api/browser/main-bridge/extension-package')
 }
 
 export async function createBrowserProfile(input: { name: string; driver?: 'managed' | 'remote-cdp' | 'extension-relay'; cdpUrl?: string | null }) {
@@ -1017,6 +1030,24 @@ export async function createBrowserProfileMainBridgePairing(id: string) {
       method: 'POST',
     },
   )
+}
+
+export async function downloadBrowserMainBridgeExtensionBundle() {
+  const base = await getBackendBaseUrl()
+  const res = await fetch(`${base}/api/browser/main-bridge/extension-download`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error || `Download failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'youclaw-main-browser-chromium.zip'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 export async function connectBrowserProfileRelay(id: string, input: { token: string; cdpUrl: string }) {

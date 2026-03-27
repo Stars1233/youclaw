@@ -3,6 +3,7 @@ import { z } from 'zod/v4'
 import type { AgentManager } from '../agent/index.ts'
 import type { BrowserManager } from './manager.ts'
 import { detectInstalledBrowsers } from './detect.ts'
+import { buildBrowserExtensionZip, getBrowserExtensionPackageInfo } from './extension-package.ts'
 import { BrowserRelayTokenError } from './relay.ts'
 import {
   pollExtensionBridgeCommand,
@@ -98,6 +99,27 @@ export function createBrowserRoutes(browserManager: BrowserManager, _agentManage
 
   app.get('/browser/discovery', (c) => {
     return c.json(detectInstalledBrowsers())
+  })
+
+  app.get('/browser/main-bridge/extension-package', (c) => {
+    try {
+      return c.json(getBrowserExtensionPackageInfo())
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: message }, 500)
+    }
+  })
+
+  app.get('/browser/main-bridge/extension-download', (c) => {
+    try {
+      const bundle = buildBrowserExtensionZip()
+      c.header('Content-Type', 'application/zip')
+      c.header('Content-Disposition', 'attachment; filename="youclaw-main-browser-chromium.zip"')
+      return c.body(bundle)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: message }, 500)
+    }
   })
 
   app.get('/browser/profiles', (c) => {

@@ -6,6 +6,7 @@ import {
   deleteBrowserProfile,
   disconnectBrowserProfileMainBridge,
   getBrowserDiscovery,
+  getBrowserMainBridgeExtensionPackage,
   getBrowserProfileMainBridge,
   getBrowserProfileRelay,
   restartBrowserProfile,
@@ -13,8 +14,15 @@ import {
   selectBrowserProfileMainBridgeBrowser,
   startBrowserProfile,
   stopBrowserProfile,
+  downloadBrowserMainBridgeExtensionBundle,
 } from '../api/client'
-import type { BrowserDiscoveryDTO, BrowserMainBridgeDTO, BrowserProfileDTO, BrowserRelayDTO } from '../api/client'
+import type {
+  BrowserDiscoveryDTO,
+  BrowserExtensionPackageDTO,
+  BrowserMainBridgeDTO,
+  BrowserProfileDTO,
+  BrowserRelayDTO,
+} from '../api/client'
 import { cn } from '../lib/utils'
 import { useI18n } from '../i18n'
 import { useChatContext } from '../hooks/chatCtx'
@@ -32,6 +40,7 @@ import {
 import { AlertTriangle, FolderOpen, Globe, Link, Play, Plus, RotateCw, Square, Trash2 } from 'lucide-react'
 import { useDragRegion } from '@/hooks/useDragRegion'
 import { notify } from '@/stores/app'
+import { getBackendBaseUrl } from '@/api/transport'
 
 export function BrowserProfiles() {
   const { t } = useI18n()
@@ -45,6 +54,8 @@ export function BrowserProfiles() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [browserDiscovery, setBrowserDiscovery] = useState<BrowserDiscoveryDTO | null>(null)
+  const [extensionPackage, setExtensionPackage] = useState<BrowserExtensionPackageDTO | null>(null)
+  const [backendUrlHint, setBackendUrlHint] = useState('')
 
   const selectedProfile = profiles.find((p) => p.id === selectedId) ?? null
 
@@ -58,6 +69,11 @@ export function BrowserProfiles() {
 
   useEffect(() => {
     getBrowserDiscovery().then(setBrowserDiscovery).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    getBrowserMainBridgeExtensionPackage().then(setExtensionPackage).catch(() => {})
+    getBackendBaseUrl().then(setBackendUrlHint).catch(() => {})
   }, [])
 
   const handleDelete = async (id: string) => {
@@ -166,6 +182,8 @@ export function BrowserProfiles() {
         ) : selectedProfile ? (
           <ProfileDetail
             profile={selectedProfile}
+            extensionPackage={extensionPackage}
+            backendUrlHint={backendUrlHint}
             onRefresh={loadProfiles}
             isBusy={busyId === selectedProfile.id}
             onStart={() => handleControl(selectedProfile.id, 'start')}
@@ -305,6 +323,8 @@ function DriverGuideCard({
 
 function ProfileDetail({
   profile,
+  extensionPackage,
+  backendUrlHint,
   onRefresh,
   isBusy,
   onStart,
@@ -313,6 +333,8 @@ function ProfileDetail({
   onDelete,
 }: {
   profile: BrowserProfileDTO
+  extensionPackage: BrowserExtensionPackageDTO | null
+  backendUrlHint: string
   onRefresh: () => void
   isBusy: boolean
   onStart: () => void
@@ -532,6 +554,8 @@ function ProfileDetail({
         <div className="rounded-2xl border border-border p-4 space-y-4">
           <MainBridgeCard
             mainBridge={mainBridge}
+            extensionPackage={extensionPackage}
+            backendUrlHint={backendUrlHint}
             onCreatePairing={handleCreatePairing}
             onUseRecommended={() => handleSelectMainBridgeBrowser(null)}
             onSelectBrowser={(browserId) => handleSelectMainBridgeBrowser(browserId)}
@@ -670,6 +694,8 @@ function ProfileDetail({
 
 function MainBridgeCard({
   mainBridge,
+  extensionPackage,
+  backendUrlHint,
   onCreatePairing,
   onUseRecommended,
   onSelectBrowser,
@@ -677,6 +703,8 @@ function MainBridgeCard({
   labels,
 }: {
   mainBridge: BrowserMainBridgeDTO | null
+  extensionPackage: BrowserExtensionPackageDTO | null
+  backendUrlHint: string
   onCreatePairing: () => void
   onUseRecommended: () => void
   onSelectBrowser: (browserId: string | null) => void
@@ -735,6 +763,52 @@ function MainBridgeCard({
           )}
         </div>
       )}
+
+      <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">
+        <div className="text-sm font-medium text-foreground">Install Extension</div>
+        {extensionPackage ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <InfoCard label="Version" value={extensionPackage.version} />
+              <InfoCard label="Backend URL" value={backendUrlHint || 'http://127.0.0.1:62601'} />
+            </div>
+            <InfoCard label="Extension Path" value={extensionPackage.directoryPath} />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => downloadBrowserMainBridgeExtensionBundle().catch((err) => {
+                  notify.error(err instanceof Error ? err.message : 'Failed to download extension bundle', {
+                    durationMs: 6000,
+                  })
+                })}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
+              >
+                Download Extension Bundle
+              </button>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(extensionPackage.directoryPath).then(() => {
+                  notify.success('Extension path copied.')
+                }).catch((err) => {
+                  notify.error(err instanceof Error ? err.message : 'Failed to copy extension path', {
+                    durationMs: 6000,
+                  })
+                })}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
+              >
+                Copy Extension Path
+              </button>
+            </div>
+            <div className="text-xs text-muted-foreground leading-6">
+              Load the unpacked extension from the directory above, open the extension popup, enter the backend URL and pairing code, then click “Connect Current Tab”.
+            </div>
+          </>
+        ) : (
+          <div className="text-xs text-muted-foreground">
+            Extension package metadata is not available yet.
+          </div>
+        )}
+      </div>
 
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
