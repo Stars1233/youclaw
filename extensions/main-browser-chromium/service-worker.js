@@ -8,11 +8,19 @@ async function getBridgeState() {
   const stored = await chrome.storage.local.get({
     backendUrl: 'http://127.0.0.1:62601',
     bridgeProfileId: null,
+    bridgeTabId: null,
   })
   return {
     backendUrl: normalizeBackendUrl(stored.backendUrl),
     profileId: stored.bridgeProfileId,
+    tabId: stored.bridgeTabId,
   }
+}
+
+async function setBridgeTabId(tabId) {
+  await chrome.storage.local.set({
+    bridgeTabId: tabId != null ? String(tabId) : null,
+  })
 }
 
 async function executeInTab(tabId, fn, args = []) {
@@ -26,22 +34,24 @@ async function executeInTab(tabId, fn, args = []) {
 
 async function executeCommand(command) {
   const tabId = command.payload?.tabId ? Number(command.payload.tabId) : undefined
-  const currentTabId = command.payload?.tabId ? Number(command.payload.tabId) : undefined
 
   switch (command.action) {
     case 'open_tab': {
       const tab = await chrome.tabs.create({ url: command.payload?.url || 'about:blank' })
+      await setBridgeTabId(tab.id)
       return {
+        tabId: tab.id != null ? String(tab.id) : null,
         url: tab.url ?? '',
         title: tab.title ?? '',
       }
     }
     case 'navigate': {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      const targetTabId = currentTabId ?? tab?.id
+      const targetTabId = tabId ?? tab?.id
       if (!targetTabId) throw new Error('No target tab available for navigate')
       const updated = await chrome.tabs.update(targetTabId, { url: command.payload?.url || 'about:blank' })
       return {
+        tabId: updated.id != null ? String(updated.id) : null,
         url: updated.url ?? '',
         title: updated.title ?? '',
       }
@@ -82,6 +92,7 @@ async function executeCommand(command) {
           })
         }
         return {
+          tabId: String(targetTabId),
           url: location.href,
           title: document.title,
           text: normalize(document.body?.innerText || '').slice(0, 4000),
@@ -124,6 +135,7 @@ async function executeCommand(command) {
             throw new Error(`Unsupported interaction: ${payload.interaction}`)
         }
         return {
+          tabId: String(targetTabId),
           url: location.href,
           title: document.title,
         }
@@ -138,7 +150,7 @@ async function executeCommand(command) {
         const element = document.querySelector(selector)
         if (!element) throw new Error(`Selector not found: ${selector}`)
         element.click()
-        return { url: location.href, title: document.title }
+        return { tabId: String(targetTabId), url: location.href, title: document.title }
       }, [command.payload?.selector])
     }
     case 'type': {
@@ -151,7 +163,7 @@ async function executeCommand(command) {
         element.value = text || ''
         element.dispatchEvent(new Event('input', { bubbles: true }))
         element.dispatchEvent(new Event('change', { bubbles: true }))
-        return { url: location.href, title: document.title }
+        return { tabId: String(targetTabId), url: location.href, title: document.title }
       }, [command.payload?.selector, command.payload?.text])
     }
     case 'press_key': {
@@ -162,7 +174,7 @@ async function executeCommand(command) {
         const target = document.activeElement || document.body
         const event = new KeyboardEvent('keydown', { key, bubbles: true })
         target.dispatchEvent(event)
-        return { url: location.href, title: document.title }
+        return { tabId: String(targetTabId), url: location.href, title: document.title }
       }, [command.payload?.key])
     }
     case 'close_tab': {
@@ -170,12 +182,17 @@ async function executeCommand(command) {
       const targetTabId = tabId ?? tab?.id
       if (!targetTabId) throw new Error('No target tab available for close_tab')
       await chrome.tabs.remove(targetTabId)
-      return { closed: true }
+      await setBridgeTabId(null)
+      return { closed: true, tabId: null, url: null, title: null }
     }
     case 'screenshot': {
-      const dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: 'png' })
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      const targetWindowId = undefined
+      const dataUrl = await chrome.tabs.captureVisibleTab(targetWindowId, { format: 'png' })
+      const [tab] = tabId != null
+        ? await chrome.tabs.query({ windowType: 'normal' }).then((tabs) => tabs.filter((entry) => entry.id === tabId))
+        : await chrome.tabs.query({ active: true, currentWindow: true })
       return {
+        tabId: tab?.id != null ? String(tab.id) : null,
         dataUrl,
         url: tab?.url ?? '',
         title: tab?.title ?? '',
@@ -248,6 +265,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     chrome.storage.local.set({
       backendUrl: normalizeBackendUrl(message.backendUrl),
       bridgeProfileId: message.profileId ?? null,
+      bridgeTabId: message.tabId ?? null,
     }).then(() => {
       ensurePolling()
       sendResponse({ ok: true })

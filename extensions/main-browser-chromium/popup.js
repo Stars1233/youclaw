@@ -76,11 +76,13 @@ async function connectCurrentTab() {
 
   await chrome.storage.local.set({
     bridgeProfileId: body?.state?.profileId ?? null,
+    bridgeTabId: tab.id != null ? String(tab.id) : null,
   })
   chrome.runtime.sendMessage({
     type: 'bridge-attached',
     backendUrl,
     profileId: body?.state?.profileId ?? null,
+    tabId: tab.id != null ? String(tab.id) : null,
   })
 
   return body

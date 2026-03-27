@@ -5,6 +5,7 @@ import { getChatBrowserState, upsertChatBrowserState } from './store.ts'
 import {
   enqueueExtensionBridgeCommand,
   getExtensionBridgeSession,
+  setExtensionBridgeSession,
 } from './extension-bridge.ts'
 import type { BrowserRefAction } from './types.ts'
 
@@ -26,6 +27,7 @@ type ExtensionSnapshotRef = {
 }
 
 type ExtensionCommandResult = {
+  tabId?: string | null
   url?: string | null
   title?: string | null
   text?: string
@@ -63,13 +65,42 @@ function requireExtensionSession(profileId: string) {
   return session
 }
 
+function syncExtensionSessionFromResult(profileId: string, result: ExtensionCommandResult): void {
+  const session = getExtensionBridgeSession(profileId)
+  if (!session) return
+
+  if (result.closed) {
+    setExtensionBridgeSession(profileId, {
+      tabId: null,
+      tabUrl: null,
+      tabTitle: null,
+    })
+    return
+  }
+
+  setExtensionBridgeSession(profileId, {
+    tabId: result.tabId ?? session.tabId,
+    tabUrl: result.url ?? session.tabUrl,
+    tabTitle: result.title ?? session.tabTitle,
+  })
+}
+
 async function runExtensionCommand(
   profileId: string,
   action: string,
   payload: Record<string, unknown>,
 ): Promise<ExtensionCommandResult> {
-  requireExtensionSession(profileId)
-  return enqueueExtensionBridgeCommand(profileId, action as Parameters<typeof enqueueExtensionBridgeCommand>[1], payload) as Promise<ExtensionCommandResult>
+  const session = requireExtensionSession(profileId)
+  const result = await enqueueExtensionBridgeCommand(
+    profileId,
+    action as Parameters<typeof enqueueExtensionBridgeCommand>[1],
+    {
+      tabId: session.tabId,
+      ...payload,
+    },
+  ) as ExtensionCommandResult
+  syncExtensionSessionFromResult(profileId, result)
+  return result
 }
 
 export async function openTabForExtensionChat(params: {
