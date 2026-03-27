@@ -392,6 +392,17 @@ function ProfileDetail({
     void loadRelay()
   }, [loadRelay])
 
+  useEffect(() => {
+    if (!isExtensionRelay) return
+
+    const intervalId = window.setInterval(() => {
+      void loadMainBridge()
+      void loadRelay()
+    }, 4000)
+
+    return () => window.clearInterval(intervalId)
+  }, [isExtensionRelay, loadMainBridge, loadRelay])
+
   const handleRelayConnect = async () => {
     if (!mainBridge?.relayToken || !relayUrl.trim()) return
     setRelayBusy('connect')
@@ -564,6 +575,7 @@ function ProfileDetail({
               title: t.browser.mainBridgeTitle,
               body: t.browser.mainBridgeBody,
               statusConnected: t.browser.mainBridgeStatusConnected,
+              statusPaired: t.browser.mainBridgeStatusPaired,
               statusReady: t.browser.mainBridgeStatusReady,
               statusNoBrowser: t.browser.mainBridgeStatusNoBrowser,
               selectionLabel: t.browser.mainBridgeSelectionLabel,
@@ -572,6 +584,11 @@ function ProfileDetail({
               selectionNone: t.browser.mainBridgeSelectionNone,
               useRecommended: t.browser.mainBridgeUseRecommended,
               selectLabel: t.browser.mainBridgeSelectLabel,
+              refresh: t.browser.mainBridgeRefresh,
+              copyBackend: t.browser.mainBridgeCopyBackend,
+              copyPairing: t.browser.mainBridgeCopyPairing,
+              pairingExpires: t.browser.mainBridgePairingExpires,
+              connectedSession: t.browser.mainBridgeConnectedSession,
               detectedRecommended: t.browser.detectedRecommended,
               detectedBrowsersEmpty: t.browser.detectedBrowsersEmpty,
             }}
@@ -713,6 +730,7 @@ function MainBridgeCard({
     title: string
     body: string
     statusConnected: string
+    statusPaired: string
     statusReady: string
     statusNoBrowser: string
     selectionLabel: string
@@ -721,6 +739,11 @@ function MainBridgeCard({
     selectionNone: string
     useRecommended: string
     selectLabel: string
+    refresh: string
+    copyBackend: string
+    copyPairing: string
+    pairingExpires: string
+    connectedSession: string
     detectedRecommended: string
     detectedBrowsersEmpty: string
   }
@@ -728,6 +751,8 @@ function MainBridgeCard({
   const statusText =
     mainBridge?.status === 'connected'
       ? labels.statusConnected
+      : mainBridge?.status === 'paired'
+        ? labels.statusPaired
       : mainBridge?.status === 'ready'
         ? labels.statusReady
         : labels.statusNoBrowser
@@ -753,8 +778,14 @@ function MainBridgeCard({
 
       {mainBridge?.connectedBrowserName && (
         <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2">
+          <div className="text-xs text-muted-foreground">{labels.connectedSession}</div>
           <div className="text-sm font-medium text-foreground">{mainBridge.connectedBrowserName}</div>
           <div className="text-xs text-muted-foreground">Mode: {mainBridge.connectionMode}</div>
+          {mainBridge.connectedAt && (
+            <div className="text-xs text-muted-foreground">
+              Connected at {new Date(mainBridge.connectedAt).toLocaleString()}
+            </div>
+          )}
           {mainBridge.connectedTabTitle && (
             <div className="text-sm text-foreground break-words">{mainBridge.connectedTabTitle}</div>
           )}
@@ -774,6 +805,19 @@ function MainBridgeCard({
             </div>
             <InfoCard label="Extension Path" value={extensionPackage.directoryPath} />
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(backendUrlHint || 'http://127.0.0.1:62601').then(() => {
+                  notify.success('Backend URL copied.')
+                }).catch((err) => {
+                  notify.error(err instanceof Error ? err.message : 'Failed to copy backend URL', {
+                    durationMs: 6000,
+                  })
+                })}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
+              >
+                {labels.copyBackend}
+              </button>
               <button
                 type="button"
                 onClick={() => downloadBrowserMainBridgeExtensionBundle().catch((err) => {
@@ -825,8 +869,36 @@ function MainBridgeCard({
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Pairing Code</div>
             <div className="font-mono text-sm text-foreground">{mainBridge.pairingCode}</div>
+            {mainBridge.pairingCodeExpiresAt && (
+              <div className="text-xs text-muted-foreground">
+                {labels.pairingExpires} {new Date(mainBridge.pairingCodeExpiresAt).toLocaleString()}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground">
               Use this code in the extension popup to connect the current tab.
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(mainBridge.pairingCode ?? '').then(() => {
+                  notify.success('Pairing code copied.')
+                }).catch((err) => {
+                  notify.error(err instanceof Error ? err.message : 'Failed to copy pairing code', {
+                    durationMs: 6000,
+                  })
+                })}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
+              >
+                {labels.copyPairing}
+              </button>
+              <button
+                type="button"
+                onClick={onCreatePairing}
+                disabled={disabled}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                {labels.refresh}
+              </button>
             </div>
           </div>
         ) : (
