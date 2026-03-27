@@ -14,6 +14,8 @@ describe('browser discovery wiring', () => {
 
     expect(routes).toContain("app.get('/browser/discovery'")
     expect(routes).toContain('detectInstalledBrowsers()')
+    expect(routes).toContain("app.get('/browser/profiles/:id/main-bridge'")
+    expect(routes).toContain("app.post('/browser/profiles/:id/main-bridge/select'")
   })
 
   test('browser client and UI expose the main browser advanced flow', () => {
@@ -22,7 +24,12 @@ describe('browser discovery wiring', () => {
     const en = read('web/src/i18n/en.ts')
 
     expect(client).toContain('export async function getBrowserDiscovery()')
+    expect(client).toContain('export async function getBrowserProfileMainBridge(id: string)')
+    expect(client).toContain('export async function selectBrowserProfileMainBridgeBrowser')
     expect(page).toContain('getBrowserDiscovery().then(setBrowserDiscovery)')
+    expect(page).toContain('getBrowserProfileMainBridge(profile.id)')
+    expect(page).toContain('selectBrowserProfileMainBridgeBrowser(profile.id, browserId)')
+    expect(page).toContain('MainBridgeCard')
     expect(page).toContain('Main Browser (Advanced)')
     expect(page).toContain('showAdvancedRelay')
     expect(en).toContain("relayTitle: 'Main Browser (Advanced)'")

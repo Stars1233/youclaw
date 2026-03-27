@@ -882,6 +882,23 @@ export interface BrowserDiscoveryDTO {
   recommendationSource: 'env' | 'priority' | 'none'
 }
 
+export interface BrowserMainBridgeDTO {
+  profileId: string
+  selectedBrowserId: string | null
+  selectedBrowserName: string | null
+  selectedExecutablePath: string | null
+  selectionSource: 'profile' | 'recommended' | 'none'
+  browsers: BrowserDiscoveryEntryDTO[]
+  recommendedBrowserId: string | null
+  recommendationSource: 'env' | 'priority' | 'none'
+  relayConnected: boolean
+  relayToken: string
+  relayCdpUrl: string | null
+  status: 'connected' | 'ready' | 'no_browser_detected'
+  connectionMode: 'manual-cdp-fallback'
+  extensionBridgeAvailable: false
+}
+
 export async function getBrowserProfiles() {
   return apiFetch<BrowserProfileDTO[]>('/api/browser/profiles')
 }
@@ -938,6 +955,20 @@ export async function getBrowserProfileTabs(id: string) {
 
 export async function getBrowserProfileRelay(id: string) {
   return apiFetch<BrowserRelayDTO>(`/api/browser/profiles/${encodeURIComponent(id)}/relay`)
+}
+
+export async function getBrowserProfileMainBridge(id: string) {
+  return apiFetch<BrowserMainBridgeDTO>(`/api/browser/profiles/${encodeURIComponent(id)}/main-bridge`)
+}
+
+export async function selectBrowserProfileMainBridgeBrowser(id: string, browserId: string | null) {
+  return apiFetch<{ ok: boolean; state: BrowserMainBridgeDTO }>(
+    `/api/browser/profiles/${encodeURIComponent(id)}/main-bridge/select`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ browserId }),
+    },
+  )
 }
 
 export async function connectBrowserProfileRelay(id: string, input: { token: string; cdpUrl: string }) {

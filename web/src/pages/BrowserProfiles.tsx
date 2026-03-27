@@ -5,13 +5,15 @@ import {
   deleteBrowserProfile,
   disconnectBrowserProfileRelay,
   getBrowserDiscovery,
+  getBrowserProfileMainBridge,
   getBrowserProfileRelay,
   restartBrowserProfile,
   rotateBrowserProfileRelayToken,
+  selectBrowserProfileMainBridgeBrowser,
   startBrowserProfile,
   stopBrowserProfile,
 } from '../api/client'
-import type { BrowserDiscoveryDTO, BrowserProfileDTO, BrowserRelayDTO } from '../api/client'
+import type { BrowserDiscoveryDTO, BrowserMainBridgeDTO, BrowserProfileDTO, BrowserRelayDTO } from '../api/client'
 import { cn } from '../lib/utils'
 import { useI18n } from '../i18n'
 import { useChatContext } from '../hooks/chatCtx'
@@ -163,7 +165,6 @@ export function BrowserProfiles() {
         ) : selectedProfile ? (
           <ProfileDetail
             profile={selectedProfile}
-            browserDiscovery={browserDiscovery}
             onRefresh={loadProfiles}
             isBusy={busyId === selectedProfile.id}
             onStart={() => handleControl(selectedProfile.id, 'start')}
@@ -303,7 +304,6 @@ function DriverGuideCard({
 
 function ProfileDetail({
   profile,
-  browserDiscovery,
   onRefresh,
   isBusy,
   onStart,
@@ -312,7 +312,6 @@ function ProfileDetail({
   onDelete,
 }: {
   profile: BrowserProfileDTO
-  browserDiscovery: BrowserDiscoveryDTO | null
   onRefresh: () => void
   isBusy: boolean
   onStart: () => void
@@ -323,10 +322,27 @@ function ProfileDetail({
   const runtimeStatus = profile.runtime?.status ?? 'stopped'
   const running = runtimeStatus === 'running' || runtimeStatus === 'starting'
   const isExtensionRelay = profile.driver === 'extension-relay'
+  const [mainBridge, setMainBridge] = useState<BrowserMainBridgeDTO | null>(null)
   const [relay, setRelay] = useState<BrowserRelayDTO | null>(null)
   const [relayUrl, setRelayUrl] = useState('')
-  const [relayBusy, setRelayBusy] = useState<'connect' | 'disconnect' | 'rotate' | null>(null)
+  const [relayBusy, setRelayBusy] = useState<'connect' | 'disconnect' | 'rotate' | 'select-browser' | null>(null)
   const [showAdvancedRelay, setShowAdvancedRelay] = useState(false)
+
+  const loadMainBridge = useCallback(async () => {
+    if (!isExtensionRelay) {
+      setMainBridge(null)
+      return
+    }
+
+    try {
+      const next = await getBrowserProfileMainBridge(profile.id)
+      setMainBridge(next)
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Failed to load main browser state', {
+        durationMs: 6000,
+      })
+    }
+  }, [isExtensionRelay, profile.id])
 
   const loadRelay = useCallback(async () => {
     if (!isExtensionRelay) {
@@ -346,6 +362,10 @@ function ProfileDetail({
   }, [isExtensionRelay, profile.id])
 
   useEffect(() => {
+    void loadMainBridge()
+  }, [loadMainBridge])
+
+  useEffect(() => {
     void loadRelay()
   }, [loadRelay])
 
@@ -360,6 +380,7 @@ function ProfileDetail({
       setRelay(result.relay)
       setRelayUrl(result.relay.cdpUrl ?? relayUrl.trim())
       notify.success('Relay attached successfully.')
+      await loadMainBridge()
       onRefresh()
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Failed to attach relay', {
@@ -376,6 +397,7 @@ function ProfileDetail({
       const result = await disconnectBrowserProfileRelay(profile.id)
       setRelay(result.relay)
       notify.success('Relay disconnected.')
+      await loadMainBridge()
       onRefresh()
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Failed to disconnect relay', {
@@ -393,9 +415,25 @@ function ProfileDetail({
       setRelay(result.relay)
       setRelayUrl('')
       notify.success('Relay token rotated. Existing relay connections were cleared.')
+      await loadMainBridge()
       onRefresh()
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Failed to rotate relay token', {
+        durationMs: 6000,
+      })
+    } finally {
+      setRelayBusy(null)
+    }
+  }
+
+  const handleSelectMainBridgeBrowser = async (browserId: string | null) => {
+    setRelayBusy('select-browser')
+    try {
+      const result = await selectBrowserProfileMainBridgeBrowser(profile.id, browserId)
+      setMainBridge(result.state)
+      notify.success('Preferred browser updated.')
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Failed to update preferred browser', {
         durationMs: 6000,
       })
     } finally {
@@ -473,7 +511,27 @@ function ProfileDetail({
 
       {isExtensionRelay && relay && (
         <div className="rounded-2xl border border-border p-4 space-y-4">
-          <DetectedBrowsersCard browserDiscovery={browserDiscovery} />
+          <MainBridgeCard
+            mainBridge={mainBridge}
+            onUseRecommended={() => handleSelectMainBridgeBrowser(null)}
+            onSelectBrowser={(browserId) => handleSelectMainBridgeBrowser(browserId)}
+            disabled={relayBusy !== null}
+            labels={{
+              title: t.browser.mainBridgeTitle,
+              body: t.browser.mainBridgeBody,
+              statusConnected: t.browser.mainBridgeStatusConnected,
+              statusReady: t.browser.mainBridgeStatusReady,
+              statusNoBrowser: t.browser.mainBridgeStatusNoBrowser,
+              selectionLabel: t.browser.mainBridgeSelectionLabel,
+              selectionAuto: t.browser.mainBridgeSelectionAuto,
+              selectionManual: t.browser.mainBridgeSelectionManual,
+              selectionNone: t.browser.mainBridgeSelectionNone,
+              useRecommended: t.browser.mainBridgeUseRecommended,
+              selectLabel: t.browser.mainBridgeSelectLabel,
+              detectedRecommended: t.browser.detectedRecommended,
+              detectedBrowsersEmpty: t.browser.detectedBrowsersEmpty,
+            }}
+          />
 
           <div className="rounded-xl border border-border/70 bg-muted/30 p-4">
             <div className="text-sm font-medium text-foreground">{t.browser.relayAdvancedTitle}</div>
@@ -586,6 +644,112 @@ function ProfileDetail({
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+function MainBridgeCard({
+  mainBridge,
+  onUseRecommended,
+  onSelectBrowser,
+  disabled,
+  labels,
+}: {
+  mainBridge: BrowserMainBridgeDTO | null
+  onUseRecommended: () => void
+  onSelectBrowser: (browserId: string | null) => void
+  disabled: boolean
+  labels: {
+    title: string
+    body: string
+    statusConnected: string
+    statusReady: string
+    statusNoBrowser: string
+    selectionLabel: string
+    selectionAuto: string
+    selectionManual: string
+    selectionNone: string
+    useRecommended: string
+    selectLabel: string
+    detectedRecommended: string
+    detectedBrowsersEmpty: string
+  }
+}) {
+  const statusText =
+    mainBridge?.status === 'connected'
+      ? labels.statusConnected
+      : mainBridge?.status === 'ready'
+        ? labels.statusReady
+        : labels.statusNoBrowser
+
+  const selectionText =
+    mainBridge?.selectionSource === 'profile'
+      ? labels.selectionManual
+      : mainBridge?.selectionSource === 'recommended'
+        ? labels.selectionAuto
+        : labels.selectionNone
+
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/80 p-4 space-y-4">
+      <div>
+        <div className="text-sm font-medium text-foreground">{labels.title}</div>
+        <p className="mt-2 text-xs leading-6 text-muted-foreground">{labels.body}</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <InfoCard label="Status" value={statusText} />
+        <InfoCard label={labels.selectionLabel} value={mainBridge?.selectedBrowserName ?? selectionText} />
+      </div>
+
+      {mainBridge && mainBridge.browsers.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onUseRecommended}
+              disabled={disabled}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              {labels.useRecommended}
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1.5">{labels.selectLabel}</label>
+            <select
+              value={mainBridge.selectedBrowserId ?? '__recommended__'}
+              onChange={(e) => onSelectBrowser(e.target.value === '__recommended__' ? null : e.target.value)}
+              disabled={disabled}
+              className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+            >
+              <option value="__recommended__">{labels.useRecommended}</option>
+              {mainBridge.browsers.map((browser) => (
+                <option key={browser.id} value={browser.id}>
+                  {browser.name}{browser.isRecommended ? ` · ${labels.detectedRecommended}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+            {mainBridge.browsers.map((browser) => (
+              <div key={browser.id} className="rounded-xl border border-border/70 bg-background/70 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-foreground">{browser.name}</div>
+                  {browser.isRecommended && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {labels.detectedRecommended}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground break-all">{browser.executablePath}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{labels.detectedBrowsersEmpty}</p>
+      )}
     </div>
   )
 }

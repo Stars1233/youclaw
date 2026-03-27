@@ -3,6 +3,7 @@ export { createBrowserRoutes } from './routes.ts'
 export { createBrowserMcpServer, logBrowserToolRegistration } from './mcp.ts'
 export { createBrowserActionRouter } from './router.ts'
 export { detectInstalledBrowsers } from './detect.ts'
+export { buildBrowserMainBridgeState } from './main-bridge.ts'
 export { disconnectAllBrowserSessions } from './pw-session.ts'
 export {
   createBrowserProfile,
@@ -26,6 +27,8 @@ export type {
   BrowserDiscoveryEntry,
   BrowserDiscoveryKind,
   BrowserDriver,
+  BrowserMainBridgeState,
+  BrowserMainBridgeStatus,
   BrowserProfile,
   BrowserRefAction,
   BrowserProfileRuntime,

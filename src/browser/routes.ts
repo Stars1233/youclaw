@@ -28,6 +28,10 @@ const RelayConnectSchema = z.object({
   cdpUrl: z.string().min(1),
 })
 
+const MainBridgeSelectSchema = z.object({
+  browserId: z.string().nullable().optional(),
+})
+
 function routeErrorStatus(err: unknown): 400 | 401 | 404 | 500 {
   if (err instanceof BrowserRelayTokenError) return 401
   const message = err instanceof Error ? err.message : String(err)
@@ -139,6 +143,34 @@ export function createBrowserRoutes(browserManager: BrowserManager, _agentManage
     try {
       const relay = browserManager.getRelayState(c.req.param('id'))
       return c.json(relay)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: message }, { status: routeErrorStatus(err) })
+    }
+  })
+
+  app.get('/browser/profiles/:id/main-bridge', (c) => {
+    try {
+      const state = browserManager.getMainBridgeState(c.req.param('id'))
+      return c.json(state)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: message }, { status: routeErrorStatus(err) })
+    }
+  })
+
+  app.post('/browser/profiles/:id/main-bridge/select', async (c) => {
+    const parsed = MainBridgeSelectSchema.safeParse(await c.req.json())
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid request', details: parsed.error.issues }, 400)
+    }
+
+    try {
+      const state = browserManager.selectMainBridgeBrowser(
+        c.req.param('id'),
+        parsed.data.browserId ?? null,
+      )
+      return c.json({ ok: true, state })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       return c.json({ error: message }, { status: routeErrorStatus(err) })

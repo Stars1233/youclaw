@@ -98,6 +98,25 @@ export interface BrowserDiscovery {
   recommendationSource: 'env' | 'priority' | 'none'
 }
 
+export type BrowserMainBridgeStatus = 'connected' | 'ready' | 'no_browser_detected'
+
+export interface BrowserMainBridgeState {
+  profileId: string
+  selectedBrowserId: string | null
+  selectedBrowserName: string | null
+  selectedExecutablePath: string | null
+  selectionSource: 'profile' | 'recommended' | 'none'
+  browsers: BrowserDiscoveryEntry[]
+  recommendedBrowserId: string | null
+  recommendationSource: BrowserDiscovery['recommendationSource']
+  relayConnected: boolean
+  relayToken: string
+  relayCdpUrl: string | null
+  status: BrowserMainBridgeStatus
+  connectionMode: 'manual-cdp-fallback'
+  extensionBridgeAvailable: false
+}
+
 export interface CreateBrowserProfileInput {
   id?: string
   name: string

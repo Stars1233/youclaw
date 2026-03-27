@@ -35,7 +35,8 @@ import {
   setBrowserRelayConnection,
   type BrowserRelayState,
 } from './relay.ts'
-import type { BrowserProfile, BrowserProfileRuntime, CreateBrowserProfileInput, UpdateBrowserProfileInput } from './types.ts'
+import { buildBrowserMainBridgeState } from './main-bridge.ts'
+import type { BrowserMainBridgeState, BrowserProfile, BrowserProfileRuntime, CreateBrowserProfileInput, UpdateBrowserProfileInput } from './types.ts'
 
 type ProfileTab = {
   id: string
@@ -70,6 +71,41 @@ export class BrowserManager {
       throw new Error('Browser profile does not use the extension-relay driver')
     }
     return getBrowserRelayState(id)
+  }
+
+  getMainBridgeState(id: string): BrowserMainBridgeState {
+    const profile = getBrowserProfile(id)
+    if (!profile) throw new Error('Browser profile not found')
+    if (profile.driver !== 'extension-relay') {
+      throw new Error('Browser profile does not use the extension-relay driver')
+    }
+    return buildBrowserMainBridgeState(profile, getBrowserRelayState(id))
+  }
+
+  selectMainBridgeBrowser(id: string, browserId: string | null): BrowserMainBridgeState {
+    const profile = getBrowserProfile(id)
+    if (!profile) throw new Error('Browser profile not found')
+    if (profile.driver !== 'extension-relay') {
+      throw new Error('Browser profile does not use the extension-relay driver')
+    }
+
+    const state = buildBrowserMainBridgeState(profile, getBrowserRelayState(id))
+    const selected = browserId
+      ? state.browsers.find((browser) => browser.id === browserId)
+      : null
+
+    if (browserId && !selected) {
+      throw new Error(`Detected browser "${browserId}" not found`)
+    }
+
+    const nextProfile = updateBrowserProfile(id, {
+      executablePath: selected?.executablePath ?? null,
+    })
+    if (!nextProfile) {
+      throw new Error('Failed to update browser profile configuration')
+    }
+
+    return buildBrowserMainBridgeState(nextProfile, getBrowserRelayState(id))
   }
 
   createProfile(input: CreateBrowserProfileInput): BrowserProfile {
