@@ -3,7 +3,7 @@
   "name": "YouClaw Main Browser Bridge",
   "version": "0.1.0",
   "description": "Connect the current Chromium tab to a local YouClaw main-browser bridge session.",
-  "permissions": ["tabs", "activeTab", "storage"],
+  "permissions": ["tabs", "activeTab", "storage", "scripting"],
   "host_permissions": ["http://127.0.0.1:*/*", "http://localhost:*/*"],
   "action": {
     "default_title": "YouClaw Bridge",

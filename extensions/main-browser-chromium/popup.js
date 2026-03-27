@@ -74,6 +74,15 @@ async function connectCurrentTab() {
     throw new Error(body?.error || `Attach failed: ${res.status}`)
   }
 
+  await chrome.storage.local.set({
+    bridgeProfileId: body?.state?.profileId ?? null,
+  })
+  chrome.runtime.sendMessage({
+    type: 'bridge-attached',
+    backendUrl,
+    profileId: body?.state?.profileId ?? null,
+  })
+
   return body
 }
 

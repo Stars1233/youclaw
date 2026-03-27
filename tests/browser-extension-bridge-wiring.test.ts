@@ -14,19 +14,26 @@ describe('browser extension bridge wiring', () => {
 
     expect(routes).toContain("app.post('/browser/profiles/:id/main-bridge/pairing'")
     expect(routes).toContain("app.post('/browser/main-bridge/extension-attach'")
+    expect(routes).toContain("app.post('/browser/main-bridge/extension-poll'")
+    expect(routes).toContain("app.post('/browser/main-bridge/extension-result'")
     expect(routes).toContain('extensionCorsHeaders()')
   })
 
   test('extension skeleton posts current tab metadata to the local bridge endpoint', () => {
     const manifest = read('extensions/main-browser-chromium/manifest.json')
     const popup = read('extensions/main-browser-chromium/popup.js')
+    const worker = read('extensions/main-browser-chromium/service-worker.js')
     const popupHtml = read('extensions/main-browser-chromium/popup.html')
 
     expect(manifest).toContain('"manifest_version": 3')
+    expect(manifest).toContain('"permissions": ["tabs", "activeTab", "storage", "scripting"]')
     expect(manifest).toContain('"host_permissions": ["http://127.0.0.1:*/*", "http://localhost:*/*"]')
     expect(popup).toContain('/api/browser/main-bridge/extension-attach')
     expect(popupHtml).toContain('Connect Current Tab')
     expect(popup).toContain('connectCurrentTab()')
     expect(popup).toContain('chrome.tabs.query')
+    expect(worker).toContain('/api/browser/main-bridge/extension-poll')
+    expect(worker).toContain('/api/browser/main-bridge/extension-result')
+    expect(worker).toContain('executeCommand(command)')
   })
 })

@@ -4,6 +4,10 @@ import type { AgentManager } from '../agent/index.ts'
 import type { BrowserManager } from './manager.ts'
 import { detectInstalledBrowsers } from './detect.ts'
 import { BrowserRelayTokenError } from './relay.ts'
+import {
+  pollExtensionBridgeCommand,
+  resolveExtensionBridgeCommand,
+} from './extension-bridge.ts'
 
 const CreateProfileSchema = z.object({
   name: z.string().min(1),
@@ -52,6 +56,18 @@ const ExtensionMainBridgeAttachSchema = z.object({
   tabUrl: z.string().nullable().optional(),
   tabTitle: z.string().nullable().optional(),
   extensionVersion: z.string().nullable().optional(),
+})
+
+const ExtensionMainBridgePollSchema = z.object({
+  profileId: z.string().min(1),
+})
+
+const ExtensionMainBridgeResultSchema = z.object({
+  profileId: z.string().min(1),
+  commandId: z.string().min(1),
+  ok: z.boolean(),
+  result: z.unknown().optional(),
+  error: z.string().nullable().optional(),
 })
 
 function routeErrorStatus(err: unknown): 400 | 401 | 404 | 500 {
@@ -259,6 +275,34 @@ export function createBrowserRoutes(browserManager: BrowserManager, _agentManage
       const message = err instanceof Error ? err.message : String(err)
       return c.json({ error: message }, { status: routeErrorStatus(err), headers: extensionCorsHeaders() })
     }
+  })
+
+  app.options('/browser/main-bridge/extension-poll', () => {
+    return new Response(null, { status: 204, headers: extensionCorsHeaders() })
+  })
+
+  app.post('/browser/main-bridge/extension-poll', async (c) => {
+    const parsed = ExtensionMainBridgePollSchema.safeParse(await c.req.json())
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid request', details: parsed.error.issues }, { status: 400, headers: extensionCorsHeaders() })
+    }
+
+    const command = pollExtensionBridgeCommand(parsed.data.profileId)
+    return c.json({ command }, { headers: extensionCorsHeaders() })
+  })
+
+  app.options('/browser/main-bridge/extension-result', () => {
+    return new Response(null, { status: 204, headers: extensionCorsHeaders() })
+  })
+
+  app.post('/browser/main-bridge/extension-result', async (c) => {
+    const parsed = ExtensionMainBridgeResultSchema.safeParse(await c.req.json())
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid request', details: parsed.error.issues }, { status: 400, headers: extensionCorsHeaders() })
+    }
+
+    resolveExtensionBridgeCommand(parsed.data)
+    return c.json({ ok: true }, { headers: extensionCorsHeaders() })
   })
 
   app.post('/browser/profiles/:id/relay/connect', async (c) => {

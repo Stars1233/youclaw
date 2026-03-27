@@ -1,5 +1,16 @@
 import type { BrowserManager } from './manager.ts'
 import {
+  actForExtensionChat,
+  clickForExtensionChat,
+  closeTabForExtensionChat,
+  navigateForExtensionChat,
+  openTabForExtensionChat,
+  pressKeyForExtensionChat,
+  screenshotForExtensionChat,
+  snapshotForExtensionChat,
+  typeForExtensionChat,
+} from './extension-session.ts'
+import {
   actForChat,
   clickForChat,
   closeTabForChat,
@@ -60,6 +71,48 @@ export function createBrowserActionRouter(params: BrowserActionRouterParams): Br
       type: async () => unsupportedTarget(target),
       pressKey: async () => unsupportedTarget(target),
       closeTab: async () => unsupportedTarget(target),
+    }
+  }
+
+  const mainBridge = browserManager.getProfile(profileId)?.driver === 'extension-relay'
+    ? browserManager.getMainBridgeState(profileId)
+    : null
+
+  if (mainBridge?.connectionMode === 'extension-bridge') {
+    return {
+      getStatus: async () => {
+        const runtime = await browserManager.getProfileStatus(profileId)
+        const profile = browserManager.getProfile(profileId)
+        return { target, profile, runtime }
+      },
+      listTabs: async () => ({
+        tabs: mainBridge.connectedTabId
+          ? [{
+              id: mainBridge.connectedTabId,
+              title: mainBridge.connectedTabTitle ?? undefined,
+              url: mainBridge.connectedTabUrl ?? undefined,
+              type: 'page',
+            }]
+          : [],
+      }),
+      openTab: async (url) =>
+        openTabForExtensionChat({ chatId, agentId, profileId, url }),
+      navigate: async (url) =>
+        navigateForExtensionChat({ chatId, agentId, profileId, url }),
+      snapshot: async () =>
+        snapshotForExtensionChat({ chatId, agentId, profileId }),
+      act: async ({ ref, action, text, option }) =>
+        actForExtensionChat({ chatId, agentId, profileId, ref, action, text, option }),
+      screenshot: async (path) =>
+        screenshotForExtensionChat({ chatId, agentId, profileId, path }),
+      click: async (selector) =>
+        clickForExtensionChat({ chatId, agentId, profileId, selector }),
+      type: async (selector, text) =>
+        typeForExtensionChat({ chatId, agentId, profileId, selector, text }),
+      pressKey: async (key) =>
+        pressKeyForExtensionChat({ chatId, agentId, profileId, key }),
+      closeTab: async (url) =>
+        closeTabForExtensionChat({ chatId, agentId, profileId, url }),
     }
   }
 

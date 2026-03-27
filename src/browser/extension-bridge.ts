@@ -18,9 +18,35 @@ export interface BrowserExtensionBridgeSession {
   updatedAt: string
 }
 
+export type BrowserExtensionCommandAction =
+  | 'open_tab'
+  | 'navigate'
+  | 'snapshot'
+  | 'act'
+  | 'screenshot'
+  | 'click'
+  | 'type'
+  | 'press_key'
+  | 'close_tab'
+
+export interface BrowserExtensionCommand {
+  id: string
+  profileId: string
+  action: BrowserExtensionCommandAction
+  payload: Record<string, unknown>
+  createdAt: string
+}
+
 const pairingCodes = new Map<string, PairingEntry>()
 const extensionSessions = new Map<string, BrowserExtensionBridgeSession>()
+const pendingCommands = new Map<string, BrowserExtensionCommand[]>()
+const commandWaiters = new Map<string, {
+  resolve: (value: unknown) => void
+  reject: (error: Error) => void
+  timeout: ReturnType<typeof setTimeout>
+}>()
 const DEFAULT_PAIRING_TTL_MS = 5 * 60 * 1000
+const DEFAULT_COMMAND_TIMEOUT_MS = 15_000
 
 function createPairingCode(): string {
   return randomBytes(4).toString('hex')
@@ -93,6 +119,7 @@ export function setExtensionBridgeSession(profileId: string, patch: {
 
 export function clearExtensionBridgeSession(profileId: string): void {
   extensionSessions.delete(profileId)
+  pendingCommands.delete(profileId)
 }
 
 export function deleteExtensionBridgeProfile(profileId: string): void {
@@ -102,4 +129,66 @@ export function deleteExtensionBridgeProfile(profileId: string): void {
       pairingCodes.delete(pairingCode)
     }
   }
+}
+
+export function enqueueExtensionBridgeCommand(
+  profileId: string,
+  action: BrowserExtensionCommandAction,
+  payload: Record<string, unknown>,
+  timeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<unknown> {
+  const command: BrowserExtensionCommand = {
+    id: randomBytes(8).toString('hex'),
+    profileId,
+    action,
+    payload,
+    createdAt: new Date().toISOString(),
+  }
+
+  const queue = pendingCommands.get(profileId) ?? []
+  queue.push(command)
+  pendingCommands.set(profileId, queue)
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      commandWaiters.delete(command.id)
+      pendingCommands.set(profileId, (pendingCommands.get(profileId) ?? []).filter((entry) => entry.id !== command.id))
+      reject(new Error(`Browser extension command "${action}" timed out`))
+    }, timeoutMs)
+
+    commandWaiters.set(command.id, {
+      resolve,
+      reject,
+      timeout,
+    })
+  })
+}
+
+export function pollExtensionBridgeCommand(profileId: string): BrowserExtensionCommand | null {
+  const queue = pendingCommands.get(profileId) ?? []
+  return queue[0] ?? null
+}
+
+export function resolveExtensionBridgeCommand(params: {
+  profileId: string
+  commandId: string
+  ok: boolean
+  result?: unknown
+  error?: string | null
+}): void {
+  const queue = pendingCommands.get(params.profileId) ?? []
+  const nextQueue = queue.filter((entry) => entry.id !== params.commandId)
+  pendingCommands.set(params.profileId, nextQueue)
+
+  const waiter = commandWaiters.get(params.commandId)
+  if (!waiter) return
+  clearTimeout(waiter.timeout)
+  commandWaiters.delete(params.commandId)
+
+  if (params.ok) {
+    waiter.resolve(params.result ?? {})
+    return
+  }
+
+  waiter.reject(new Error(params.error ?? 'Browser extension command failed'))
 }

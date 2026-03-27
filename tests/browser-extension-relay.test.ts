@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import './setup.ts'
-import { BrowserManager, type BrowserProfile } from '../src/browser/index.ts'
+import { BrowserManager } from '../src/browser/index.ts'
 import { createBrowserProfilesRoutes } from '../src/routes/browser-profiles.ts'
 import { cleanTables } from './setup.ts'
 
 class FakeRelayBrowserManager extends BrowserManager {
-  protected override async probeProfileMetadata(_profile: BrowserProfile): Promise<{ webSocketDebuggerUrl: string | null; browser: string | null }> {
+  protected override async probeProfileMetadata(): Promise<{ webSocketDebuggerUrl: string | null; browser: string | null }> {
     return {
       browser: 'Chrome/123.0.0.0',
       webSocketDebuggerUrl: 'ws://127.0.0.1:9222/devtools/browser/fake-session',
     }
   }
 
-  protected override async requestTabs(_profile: BrowserProfile): Promise<Array<{ id: string; title?: string; url?: string; type?: string }>> {
+  protected override async requestTabs(): Promise<Array<{ id: string; title?: string; url?: string; type?: string }>> {
     return [
       { id: 'tab-1', title: 'Attached Tab', url: 'https://example.com', type: 'page' },
     ]
@@ -139,5 +139,35 @@ describe('browser extension relay', () => {
     expect(result.state.connectedTabUrl).toBeNull()
     expect(result.runtime.status).toBe('stopped')
     expect(result.relay.connected).toBe(false)
+  })
+
+  test('extension bridge pairing and attach promote state to paired without relay CDP', async () => {
+    const manager = new FakeRelayBrowserManager()
+    const profile = manager.createProfile({
+      name: 'Extension Bridge',
+      driver: 'extension-relay',
+      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    })
+
+    const pairedState = manager.createMainBridgePairing(profile.id)
+    expect(pairedState.pairingCode).toBeTruthy()
+    expect(pairedState.status).toBe('ready')
+
+    const attached = manager.attachExtensionMainBridge({
+      pairingCode: pairedState.pairingCode!,
+      browserId: 'chrome',
+      browserName: 'Google Chrome',
+      browserKind: 'chrome',
+      tabId: '7',
+      tabUrl: 'https://example.com/current',
+      tabTitle: 'Current Tab',
+      extensionVersion: '0.1.0',
+    })
+
+    expect(attached.status).toBe('paired')
+    expect(attached.connectionMode).toBe('extension-bridge')
+    expect(attached.connectedBrowserName).toBe('Google Chrome')
+    expect(attached.connectedTabUrl).toBe('https://example.com/current')
+    expect(attached.extensionVersion).toBe('0.1.0')
   })
 })
