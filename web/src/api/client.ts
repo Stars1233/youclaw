@@ -900,11 +900,14 @@ export interface BrowserMainBridgeDTO {
   connectedTabId: string | null
   connectedTabUrl: string | null
   connectedTabTitle: string | null
+  extensionVersion: string | null
+  pairingCode: string | null
+  pairingCodeExpiresAt: string | null
   connectedAt: string | null
   updatedAt: string | null
-  status: 'connected' | 'ready' | 'no_browser_detected'
-  connectionMode: 'none' | 'manual-cdp-fallback' | 'main-bridge'
-  extensionBridgeAvailable: false
+  status: 'connected' | 'paired' | 'ready' | 'no_browser_detected'
+  connectionMode: 'none' | 'manual-cdp-fallback' | 'main-bridge' | 'extension-bridge'
+  extensionBridgeAvailable: true
 }
 
 export async function getBrowserProfiles() {
@@ -1001,6 +1004,15 @@ export async function connectBrowserProfileMainBridge(id: string, input: {
 export async function disconnectBrowserProfileMainBridge(id: string) {
   return apiFetch<{ ok: boolean; state: BrowserMainBridgeDTO; relay: BrowserRelayDTO; runtime: BrowserProfileDTO['runtime'] }>(
     `/api/browser/profiles/${encodeURIComponent(id)}/main-bridge/disconnect`,
+    {
+      method: 'POST',
+    },
+  )
+}
+
+export async function createBrowserProfileMainBridgePairing(id: string) {
+  return apiFetch<{ ok: boolean; state: BrowserMainBridgeDTO }>(
+    `/api/browser/profiles/${encodeURIComponent(id)}/main-bridge/pairing`,
     {
       method: 'POST',
     },

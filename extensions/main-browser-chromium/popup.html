@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouClaw Bridge</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        width: 320px;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #ffffff;
+        color: #161616;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: #5b5b5b;
+      }
+      label {
+        display: block;
+        margin: 10px 0 6px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #d6d6d6;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font: inherit;
+      }
+      button {
+        margin-top: 14px;
+        width: 100%;
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #d4513e;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .status {
+        margin-top: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>YouClaw Main Browser Bridge</h1>
+    <p>Enter the backend URL and pairing code from the YouClaw app, then attach the current tab.</p>
+
+    <label for="backend">Backend URL</label>
+    <input id="backend" placeholder="http://127.0.0.1:62601" />
+
+    <label for="pairing">Pairing Code</label>
+    <input id="pairing" placeholder="Paste pairing code" />
+
+    <button id="connect">Connect Current Tab</button>
+    <div id="status" class="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -7,6 +7,10 @@ import type {
 } from './types.ts'
 import type { BrowserRelayState } from './relay.ts'
 import { detectInstalledBrowsers } from './detect.ts'
+import {
+  getExtensionBridgeSession,
+  getMainBridgePairingCode,
+} from './extension-bridge.ts'
 
 export interface BrowserMainBridgeSession {
   browserId: string | null
@@ -90,20 +94,26 @@ export function buildBrowserMainBridgeState(
 ): BrowserMainBridgeState {
   const resolved = resolveSelectedBrowser(profile, discovery)
   const session = getBrowserMainBridgeSession(profile.id)
+  const extensionSession = getExtensionBridgeSession(profile.id)
+  const pairing = getMainBridgePairingCode(profile.id)
   const status: BrowserMainBridgeState['status'] =
     relay.connected
       ? 'connected'
-      : discovery.browsers.length > 0
-        ? 'ready'
-        : 'no_browser_detected'
+      : extensionSession
+        ? 'paired'
+        : discovery.browsers.length > 0
+          ? 'ready'
+          : 'no_browser_detected'
   const connectionMode: BrowserMainBridgeState['connectionMode'] = session
     ? 'main-bridge'
+    : extensionSession
+      ? 'extension-bridge'
     : relay.connected
       ? 'manual-cdp-fallback'
       : 'none'
-  const connectedBrowserId = session?.browserId ?? (relay.connected ? resolved.browser?.id ?? null : null)
-  const connectedBrowserName = session?.browserName ?? (relay.connected ? resolved.browser?.name ?? null : null)
-  const connectedBrowserKind = session?.browserKind ?? (relay.connected ? resolved.browser?.kind ?? null : null)
+  const connectedBrowserId = session?.browserId ?? extensionSession?.browserId ?? (relay.connected ? resolved.browser?.id ?? null : null)
+  const connectedBrowserName = session?.browserName ?? extensionSession?.browserName ?? (relay.connected ? resolved.browser?.name ?? null : null)
+  const connectedBrowserKind = session?.browserKind ?? extensionSession?.browserKind ?? (relay.connected ? resolved.browser?.kind ?? null : null)
 
   return {
     profileId: profile.id,
@@ -120,13 +130,16 @@ export function buildBrowserMainBridgeState(
     connectedBrowserId,
     connectedBrowserName,
     connectedBrowserKind,
-    connectedTabId: session?.tabId ?? null,
-    connectedTabUrl: session?.tabUrl ?? null,
-    connectedTabTitle: session?.tabTitle ?? null,
-    connectedAt: session?.connectedAt ?? (relay.connected ? relay.connectedAt : null),
-    updatedAt: session?.updatedAt ?? relay.updatedAt,
+    connectedTabId: session?.tabId ?? extensionSession?.tabId ?? null,
+    connectedTabUrl: session?.tabUrl ?? extensionSession?.tabUrl ?? null,
+    connectedTabTitle: session?.tabTitle ?? extensionSession?.tabTitle ?? null,
+    extensionVersion: extensionSession?.extensionVersion ?? null,
+    pairingCode: pairing?.pairingCode ?? null,
+    pairingCodeExpiresAt: pairing?.expiresAt ?? null,
+    connectedAt: session?.connectedAt ?? extensionSession?.connectedAt ?? (relay.connected ? relay.connectedAt : null),
+    updatedAt: session?.updatedAt ?? extensionSession?.updatedAt ?? relay.updatedAt,
     status,
     connectionMode,
-    extensionBridgeAvailable: false,
+    extensionBridgeAvailable: true,
   }
 }

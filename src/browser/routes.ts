@@ -43,6 +43,17 @@ const MainBridgeConnectSchema = z.object({
   tabTitle: z.string().nullable().optional(),
 })
 
+const ExtensionMainBridgeAttachSchema = z.object({
+  pairingCode: z.string().min(1),
+  browserId: z.string().nullable().optional(),
+  browserName: z.string().nullable().optional(),
+  browserKind: z.enum(['chrome', 'edge', 'brave', 'chromium', 'vivaldi', 'arc']).nullable().optional(),
+  tabId: z.string().nullable().optional(),
+  tabUrl: z.string().nullable().optional(),
+  tabTitle: z.string().nullable().optional(),
+  extensionVersion: z.string().nullable().optional(),
+})
+
 function routeErrorStatus(err: unknown): 400 | 401 | 404 | 500 {
   if (err instanceof BrowserRelayTokenError) return 401
   const message = err instanceof Error ? err.message : String(err)
@@ -55,6 +66,14 @@ function routeErrorStatus(err: unknown): 400 | 401 | 404 | 500 {
     return 400
   }
   return 500
+}
+
+function extensionCorsHeaders(): HeadersInit {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
 export function createBrowserRoutes(browserManager: BrowserManager, _agentManager?: AgentManager) {
@@ -188,6 +207,16 @@ export function createBrowserRoutes(browserManager: BrowserManager, _agentManage
     }
   })
 
+  app.post('/browser/profiles/:id/main-bridge/pairing', async (c) => {
+    try {
+      const state = browserManager.createMainBridgePairing(c.req.param('id'))
+      return c.json({ ok: true, state })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: message }, { status: routeErrorStatus(err) })
+    }
+  })
+
   app.post('/browser/profiles/:id/main-bridge/connect', async (c) => {
     const parsed = MainBridgeConnectSchema.safeParse(await c.req.json())
     if (!parsed.success) {
@@ -210,6 +239,25 @@ export function createBrowserRoutes(browserManager: BrowserManager, _agentManage
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       return c.json({ error: message }, { status: routeErrorStatus(err) })
+    }
+  })
+
+  app.options('/browser/main-bridge/extension-attach', () => {
+    return new Response(null, { status: 204, headers: extensionCorsHeaders() })
+  })
+
+  app.post('/browser/main-bridge/extension-attach', async (c) => {
+    const parsed = ExtensionMainBridgeAttachSchema.safeParse(await c.req.json())
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid request', details: parsed.error.issues }, { status: 400, headers: extensionCorsHeaders() })
+    }
+
+    try {
+      const state = browserManager.attachExtensionMainBridge(parsed.data)
+      return c.json({ ok: true, state }, { headers: extensionCorsHeaders() })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: message }, { status: routeErrorStatus(err), headers: extensionCorsHeaders() })
     }
   })
 

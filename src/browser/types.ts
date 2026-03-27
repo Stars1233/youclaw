@@ -98,8 +98,8 @@ export interface BrowserDiscovery {
   recommendationSource: 'env' | 'priority' | 'none'
 }
 
-export type BrowserMainBridgeStatus = 'connected' | 'ready' | 'no_browser_detected'
-export type BrowserMainBridgeConnectionMode = 'none' | 'manual-cdp-fallback' | 'main-bridge'
+export type BrowserMainBridgeStatus = 'connected' | 'paired' | 'ready' | 'no_browser_detected'
+export type BrowserMainBridgeConnectionMode = 'none' | 'manual-cdp-fallback' | 'main-bridge' | 'extension-bridge'
 
 export interface BrowserMainBridgeState {
   profileId: string
@@ -119,11 +119,14 @@ export interface BrowserMainBridgeState {
   connectedTabId: string | null
   connectedTabUrl: string | null
   connectedTabTitle: string | null
+  extensionVersion: string | null
+  pairingCode: string | null
+  pairingCodeExpiresAt: string | null
   connectedAt: string | null
   updatedAt: string | null
   status: BrowserMainBridgeStatus
   connectionMode: BrowserMainBridgeConnectionMode
-  extensionBridgeAvailable: false
+  extensionBridgeAvailable: true
 }
 
 export interface CreateBrowserProfileInput {
