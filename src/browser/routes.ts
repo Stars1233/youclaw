@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod/v4'
 import type { AgentManager } from '../agent/index.ts'
 import type { BrowserManager } from './manager.ts'
+import { detectInstalledBrowsers } from './detect.ts'
 import { BrowserRelayTokenError } from './relay.ts'
 
 const CreateProfileSchema = z.object({
@@ -43,6 +44,11 @@ function routeErrorStatus(err: unknown): 400 | 401 | 404 | 500 {
 
 export function createBrowserRoutes(browserManager: BrowserManager, _agentManager?: AgentManager) {
   const app = new Hono()
+  void _agentManager
+
+  app.get('/browser/discovery', (c) => {
+    return c.json(detectInstalledBrowsers())
+  })
 
   app.get('/browser/profiles', (c) => {
     return c.json(browserManager.listProfiles())

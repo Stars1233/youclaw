@@ -4,13 +4,14 @@ import {
   createBrowserProfile,
   deleteBrowserProfile,
   disconnectBrowserProfileRelay,
+  getBrowserDiscovery,
   getBrowserProfileRelay,
   restartBrowserProfile,
   rotateBrowserProfileRelayToken,
   startBrowserProfile,
   stopBrowserProfile,
 } from '../api/client'
-import type { BrowserProfileDTO, BrowserRelayDTO } from '../api/client'
+import type { BrowserDiscoveryDTO, BrowserProfileDTO, BrowserRelayDTO } from '../api/client'
 import { cn } from '../lib/utils'
 import { useI18n } from '../i18n'
 import { useChatContext } from '../hooks/chatCtx'
@@ -40,6 +41,7 @@ export function BrowserProfiles() {
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [browserDiscovery, setBrowserDiscovery] = useState<BrowserDiscoveryDTO | null>(null)
 
   const selectedProfile = profiles.find((p) => p.id === selectedId) ?? null
 
@@ -50,6 +52,10 @@ export function BrowserProfiles() {
   useEffect(() => {
     loadProfiles()
   }, [loadProfiles])
+
+  useEffect(() => {
+    getBrowserDiscovery().then(setBrowserDiscovery).catch(() => {})
+  }, [])
 
   const handleDelete = async (id: string) => {
     await deleteBrowserProfile(id).catch(() => {})
@@ -157,6 +163,7 @@ export function BrowserProfiles() {
         ) : selectedProfile ? (
           <ProfileDetail
             profile={selectedProfile}
+            browserDiscovery={browserDiscovery}
             onRefresh={loadProfiles}
             isBusy={busyId === selectedProfile.id}
             onStart={() => handleControl(selectedProfile.id, 'start')}
@@ -166,7 +173,7 @@ export function BrowserProfiles() {
           />
         ) : (
           <div className="p-6">
-            <BrowserGuideCard />
+            <BrowserGuideCard browserDiscovery={browserDiscovery} />
           </div>
         )}
       </div>
@@ -195,7 +202,7 @@ export function BrowserProfiles() {
   )
 }
 
-function BrowserGuideCard() {
+function BrowserGuideCard({ browserDiscovery }: { browserDiscovery: BrowserDiscoveryDTO | null }) {
   const { t } = useI18n()
 
   return (
@@ -213,6 +220,8 @@ function BrowserGuideCard() {
         <DriverGuideCard title={t.browser.relayTitle} body={t.browser.relayBody} advanced />
       </div>
 
+      <DetectedBrowsersCard browserDiscovery={browserDiscovery} />
+
       <div className="rounded-2xl border border-amber-500/30 bg-amber-500/8 p-4 text-sm sm:p-5">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -225,6 +234,38 @@ function BrowserGuideCard() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function DetectedBrowsersCard({ browserDiscovery }: { browserDiscovery: BrowserDiscoveryDTO | null }) {
+  const { t } = useI18n()
+  const browsers = browserDiscovery?.browsers ?? []
+
+  return (
+    <div className="rounded-2xl border border-border bg-background/70 p-5 sm:p-6">
+      <h3 className="text-base font-semibold">{t.browser.detectedBrowsersTitle}</h3>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.browser.detectedBrowsersHint}</p>
+
+      {browsers.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">{t.browser.detectedBrowsersEmpty}</p>
+      ) : (
+        <div className="mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+          {browsers.map((browser) => (
+            <div key={browser.id} className="rounded-xl border border-border/70 bg-background/80 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="font-medium text-foreground">{browser.name}</div>
+                {browser.isRecommended && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    {t.browser.detectedRecommended}
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground break-all">{browser.executablePath}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -262,6 +303,7 @@ function DriverGuideCard({
 
 function ProfileDetail({
   profile,
+  browserDiscovery,
   onRefresh,
   isBusy,
   onStart,
@@ -270,6 +312,7 @@ function ProfileDetail({
   onDelete,
 }: {
   profile: BrowserProfileDTO
+  browserDiscovery: BrowserDiscoveryDTO | null
   onRefresh: () => void
   isBusy: boolean
   onStart: () => void
@@ -283,6 +326,7 @@ function ProfileDetail({
   const [relay, setRelay] = useState<BrowserRelayDTO | null>(null)
   const [relayUrl, setRelayUrl] = useState('')
   const [relayBusy, setRelayBusy] = useState<'connect' | 'disconnect' | 'rotate' | null>(null)
+  const [showAdvancedRelay, setShowAdvancedRelay] = useState(false)
 
   const loadRelay = useCallback(async () => {
     if (!isExtensionRelay) {
@@ -429,55 +473,74 @@ function ProfileDetail({
 
       {isExtensionRelay && relay && (
         <div className="rounded-2xl border border-border p-4 space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-xs text-muted-foreground mb-1.5">Attach Token</div>
-              <div className="text-sm font-mono break-all">{relay.token}</div>
-            </div>
+          <DetectedBrowsersCard browserDiscovery={browserDiscovery} />
+
+          <div className="rounded-xl border border-border/70 bg-muted/30 p-4">
+            <div className="text-sm font-medium text-foreground">{t.browser.relayAdvancedTitle}</div>
+            <p className="mt-2 text-xs leading-6 text-muted-foreground">{t.browser.relayAdvancedBody}</p>
             <button
               type="button"
-              onClick={handleRelayRotateToken}
-              disabled={relayBusy !== null}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
-            >
-              <RotateCw className="h-3.5 w-3.5" />
-              Rotate Token
-            </button>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium mb-1.5">Loopback CDP URL</label>
-            <input
-              value={relayUrl}
-              onChange={(e) => setRelayUrl(e.target.value)}
-              placeholder="http://127.0.0.1:9222 or ws://127.0.0.1:9222/devtools/browser/..."
-              className="w-full px-3 py-2 text-sm rounded-xl bg-muted border border-border focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              Only loopback CDP URLs are accepted. This keeps the relay limited to a browser running on the same machine.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRelayConnect}
-              disabled={relayBusy !== null || !relayUrl.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              onClick={() => setShowAdvancedRelay((current) => !current)}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
             >
               <Link className="h-3.5 w-3.5" />
-              Attach Relay
-            </button>
-            <button
-              type="button"
-              onClick={handleRelayDisconnect}
-              disabled={relayBusy !== null || !relay.connected}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
-            >
-              <Square className="h-3.5 w-3.5" />
-              Disconnect
+              {showAdvancedRelay ? 'Hide Advanced Relay' : 'Show Advanced Relay'}
             </button>
           </div>
+
+          {showAdvancedRelay && (
+            <div className="space-y-4 rounded-xl border border-border/70 bg-background/80 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1.5">Attach Token</div>
+                  <div className="text-sm font-mono break-all">{relay.token}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRelayRotateToken}
+                  disabled={relayBusy !== null}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
+                >
+                  <RotateCw className="h-3.5 w-3.5" />
+                  Rotate Token
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1.5">Loopback CDP URL</label>
+                <input
+                  value={relayUrl}
+                  onChange={(e) => setRelayUrl(e.target.value)}
+                  placeholder="http://127.0.0.1:9222 or ws://127.0.0.1:9222/devtools/browser/..."
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-muted border border-border focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Only loopback CDP URLs are accepted. This keeps the relay limited to a browser running on the same machine.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRelayConnect}
+                  disabled={relayBusy !== null || !relayUrl.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  <Link className="h-3.5 w-3.5" />
+                  Attach Relay
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRelayDisconnect}
+                  disabled={relayBusy !== null || !relay.connected}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
+                >
+                  <Square className="h-3.5 w-3.5" />
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          )}
 
           {relay.connectedAt && (
             <div className="text-xs text-muted-foreground">
@@ -598,7 +661,7 @@ function CreateProfileForm({
           >
             <option value="managed">Managed Chromium</option>
             <option value="remote-cdp">Remote CDP</option>
-            <option value="extension-relay">Extension Relay</option>
+            <option value="extension-relay">Main Browser (Advanced)</option>
           </select>
         </div>
 

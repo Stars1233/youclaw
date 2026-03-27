@@ -868,8 +868,26 @@ export interface BrowserRelayDTO {
   updatedAt: string | null
 }
 
+export interface BrowserDiscoveryEntryDTO {
+  id: string
+  name: string
+  kind: 'chrome' | 'edge' | 'brave' | 'chromium' | 'vivaldi' | 'arc'
+  executablePath: string
+  isRecommended: boolean
+}
+
+export interface BrowserDiscoveryDTO {
+  browsers: BrowserDiscoveryEntryDTO[]
+  recommendedBrowserId: string | null
+  recommendationSource: 'env' | 'priority' | 'none'
+}
+
 export async function getBrowserProfiles() {
   return apiFetch<BrowserProfileDTO[]>('/api/browser/profiles')
+}
+
+export async function getBrowserDiscovery() {
+  return apiFetch<BrowserDiscoveryDTO>('/api/browser/discovery')
 }
 
 export async function createBrowserProfile(input: { name: string; driver?: 'managed' | 'remote-cdp' | 'extension-relay'; cdpUrl?: string | null }) {

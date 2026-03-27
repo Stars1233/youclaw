@@ -1,6 +1,7 @@
 export type BrowserDriver = 'managed' | 'remote-cdp' | 'extension-relay'
 export type BrowserTarget = 'host' | 'sandbox'
 export type BrowserRefAction = 'click' | 'type' | 'select' | 'check' | 'uncheck'
+export type BrowserDiscoveryKind = 'chrome' | 'edge' | 'brave' | 'chromium' | 'vivaldi' | 'arc'
 
 export type BrowserRuntimeStatus = 'starting' | 'running' | 'stopped' | 'error'
 
@@ -81,6 +82,20 @@ export interface ChatBrowserState {
   activePageUrl: string | null
   activePageTitle: string | null
   updatedAt: string
+}
+
+export interface BrowserDiscoveryEntry {
+  id: string
+  name: string
+  kind: BrowserDiscoveryKind
+  executablePath: string
+  isRecommended: boolean
+}
+
+export interface BrowserDiscovery {
+  browsers: BrowserDiscoveryEntry[]
+  recommendedBrowserId: string | null
+  recommendationSource: 'env' | 'priority' | 'none'
 }
 
 export interface CreateBrowserProfileInput {
