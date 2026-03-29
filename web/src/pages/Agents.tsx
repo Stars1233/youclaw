@@ -20,12 +20,12 @@ import { useI18n } from '../i18n'
 import { useChatContext } from '../hooks/chatCtx'
 import { SidePanel } from '@/components/layout/SidePanel'
 import { MarketplaceCard } from '@/components/MarketplaceCard'
-import { MarketplaceDisclaimer } from '@/components/MarketplaceDisclaimer'
 import { MarketplaceInstallDialog } from '@/components/MarketplaceInstallDialog'
 import { RegistrySourceSelect } from '@/components/RegistrySourceSelect'
 import { MarketplaceVirtualList } from '@/components/skills/MarketplaceVirtualList'
 import { useMarketplaceFeed } from '@/hooks/useMarketplaceFeed'
 import { toMarketplaceCardViewModel, toMarketplaceInstallDialogViewModel } from '@/lib/marketplace-view-model'
+import { resolveMarketplaceActionSource } from '@/lib/registry-source'
 import { useAppStore } from '@/stores/app'
 import { useDragRegion } from "@/hooks/useDragRegion"
 import {
@@ -829,7 +829,9 @@ function AgentSkillsSection({
   const { t } = useI18n()
   const registrySource = useAppStore((s) => s.registrySource)
   const registrySources = useAppStore((s) => s.registrySources)
+  const locale = useAppStore((s) => s.locale)
   const setRegistrySource = useAppStore((s) => s.setRegistrySource)
+  const refreshRegistrySources = useAppStore((s) => s.refreshRegistrySources)
   const showGlobalBubble = useAppStore((s) => s.showGlobalBubble)
   const [search, setSearch] = useState('')
 
@@ -843,6 +845,7 @@ function AgentSkillsSection({
     enabled: marketplaceOpen,
     query: marketplaceQuery,
     source: registrySource,
+    locale,
     loadFailedMessage: t.agents.marketplaceError,
   })
   const {
@@ -870,6 +873,13 @@ function AgentSkillsSection({
   const formatActionError = useCallback((message: string | undefined, fallback: string) => (
     normalizeMarketplaceActionError(message ?? '', fallback, t.skills.marketplaceSkillNotFound)
   ), [t.skills.marketplaceSkillNotFound])
+  const resolveActionSource = useCallback(() => (
+    resolveMarketplaceActionSource(
+      registrySource,
+      registrySources,
+      locale,
+    )
+  ), [locale, registrySource, registrySources])
 
   const filteredSkills = allSkills.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -900,8 +910,13 @@ function AgentSkillsSection({
   const [expanded, setExpanded] = useState(false)
   const selectedCount = isWildcard ? installedSkillNames.length : boundSkillNames.size
 
+  useEffect(() => {
+    void refreshRegistrySources()
+  }, [refreshRegistrySources])
+
   const handleOpenMarketplace = () => {
     setMarketplaceQuery('')
+    void refreshRegistrySources()
     setMarketplaceOpen(true)
   }
 
@@ -928,7 +943,8 @@ function AgentSkillsSection({
     setInstallingSlug(skill.slug)
     try {
       const beforeNames = new Set(installedSkillNames)
-      const result = await installRecommendedSkill(skill.slug, registrySource)
+      const actionSource = resolveActionSource()
+      const result = await installRecommendedSkill({ slug: skill.slug, source: actionSource })
       if (!result.ok) {
         showGlobalBubble({
           type: 'error',
@@ -966,14 +982,12 @@ function AgentSkillsSection({
   const handleConfirmInstallAndBind = async (skill: MarketplaceSkill) => {
     setLoadingConfirmSlug(skill.slug)
     try {
-      const detail = await getMarketplaceSkill(skill.slug, registrySource)
+      const detail = await getMarketplaceSkill({ slug: skill.slug, source: resolveActionSource(), locale })
       setConfirmDetail(detail)
     } catch {
       setConfirmDetail({
         ...skill,
-        ownerHandle: null,
-        ownerDisplayName: null,
-        ownerImage: null,
+        author: undefined,
         moderation: null,
       })
     } finally {
@@ -1085,7 +1099,7 @@ function AgentSkillsSection({
 
       {/* Marketplace Dialog */}
       <Dialog open={marketplaceOpen} onOpenChange={(open) => { if (!open) handleCloseMarketplace() }}>
-        <DialogContent className="sm:max-w-3xl max-h-[70vh] overflow-hidden flex flex-col p-8">
+        <DialogContent className="flex h-[70vh] w-[calc(100vw-2rem)] max-h-[70vh] max-w-3xl flex-col overflow-hidden p-8">
           <div className="flex items-center gap-2 mb-2">
             <Store className="h-5 w-5 text-primary" />
             <h2 className="text-base font-semibold">{t.agents.browseMarketplace}</h2>
@@ -1103,13 +1117,13 @@ function AgentSkillsSection({
               sources={registrySources}
               value={registrySource}
               onValueChange={setRegistrySource}
-              className="w-[128px] shrink-0"
+              className="w-auto min-w-max shrink-0"
             />
           </div>
 
-          <div className="mt-4 flex min-h-0 flex-1 flex-col">
-            <MarketplaceDisclaimer compact className="mb-3" />
+          <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
             <MarketplaceVirtualList
+              className="min-h-0 flex-1"
               rows={marketplaceRows}
               listKey={marketplaceListKey}
               rowKey={(row) => row.key}
@@ -1192,7 +1206,6 @@ function AgentSkillsSection({
               onRetryLoadMore={() => {
                 void loadMoreMarketplace()
               }}
-              header={<div className="pb-3"><MarketplaceDisclaimer compact /></div>}
               scrollerClassName="pr-1"
             />
           </div>
@@ -1205,7 +1218,12 @@ function AgentSkillsSection({
               if (!open) setConfirmDetail(null)
             }}
             onConfirm={() => {
-              const skill = confirmDetail ? { slug: confirmDetail.slug, displayName: confirmDetail.displayName } : null
+              const skill = confirmDetail
+                ? {
+                    slug: confirmDetail.slug,
+                    displayName: confirmDetail.displayName,
+                  }
+                : null
               setConfirmDetail(null)
               if (skill) {
                 void installAndBindSkill(skill)

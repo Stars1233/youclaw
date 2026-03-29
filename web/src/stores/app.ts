@@ -106,6 +106,7 @@ interface AppState {
   modelReady: boolean
 
   registrySource: RegistrySelectableSource
+  defaultRegistrySource?: RegistrySelectableSource
   registrySources: RegistrySourceInfo[]
   setRegistrySource: (source: RegistrySelectableSource) => void
   setRegistrySources: (sources: RegistrySourceInfo[]) => void
@@ -142,7 +143,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   locale: 'en',
   setLocale: (locale) => {
-    set({ locale })
+    set((state) => ({
+      locale,
+      registrySource: !state.defaultRegistrySource && state.registrySources.length > 0
+        ? resolvePreferredRegistrySource(state.registrySources, undefined, locale)
+        : state.registrySource,
+    }))
     void setItem('locale', locale)
   },
 
@@ -210,6 +216,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   modelReady: false,
 
   registrySource: 'clawhub',
+  defaultRegistrySource: undefined,
   registrySources: [],
   setRegistrySource: (registrySource) => set({ registrySource }),
   setRegistrySources: (registrySources) => set({ registrySources }),
@@ -221,7 +228,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       ])
       const locale = get().locale
       const registrySource = resolvePreferredRegistrySource(sources, settings.defaultRegistrySource, locale)
-      set({ registrySources: sources, registrySource })
+      set({
+        registrySources: sources,
+        defaultRegistrySource: settings.defaultRegistrySource,
+        registrySource,
+      })
       return sources
     } catch {
       return get().registrySources
@@ -420,6 +431,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { enabled } = cloudStatus
       set({
         cloudEnabled: enabled,
+        defaultRegistrySource: settings.defaultRegistrySource,
         registrySources,
         registrySource: resolvePreferredRegistrySource(registrySources, settings.defaultRegistrySource, resolvedLocale),
       })
