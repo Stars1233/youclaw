@@ -1,72 +1,268 @@
 [
   {
-    "slug": "skill-creator",
-    "displayName": "Skill Creator",
-    "summary": "Scaffold and refine new skills with consistent frontmatter and structure.",
+    "slug": "gog",
+    "displayName": "Google Workspace",
+    "summary": "Automate Gmail, Calendar, Drive, Docs, and Sheets workflows.",
     "category": "developer-tools",
-    "tags": ["agent", "authoring", "templates"]
-  },
-  {
-    "slug": "video-frames",
-    "displayName": "Video Frames",
-    "summary": "Extract and process key frames or clips from videos for review and analysis.",
-    "category": "developer-tools",
-    "tags": ["media", "video", "frames"]
+    "tags": [
+      "integrations",
+      "google",
+      "workspace"
+    ]
   },
   {
     "slug": "github",
     "displayName": "GitHub",
     "summary": "Operate repositories, pull requests, issues, and CI flows through GitHub CLI.",
     "category": "developer-tools",
-    "tags": ["coding", "github", "collaboration"]
+    "tags": [
+      "coding",
+      "github",
+      "collaboration"
+    ]
   },
   {
-    "slug": "browser-use",
-    "displayName": "Browser Use",
-    "summary": "Automate browser testing, form filling, screenshots, and structured data extraction.",
+    "slug": "auto-updater",
+    "displayName": "Auto-Updater Skill",
+    "summary": "Automatically update Clawdbot and all installed skills once daily.",
     "category": "developer-tools",
-    "tags": ["coding", "browser", "testing"]
-  },
-  {
-    "slug": "model-usage",
-    "displayName": "Model Usage",
-    "summary": "Summarize CodexBar model-level usage and cost data for Codex or Claude.",
-    "category": "developer-tools",
-    "tags": ["coding", "cost", "observability"]
-  },
-  {
-    "slug": "playwright-mcp",
-    "displayName": "Playwright MCP",
-    "summary": "Run full browser automation workflows through a Playwright MCP server.",
-    "category": "developer-tools",
-    "tags": ["coding", "playwright", "automation"]
-  },
-  {
-    "slug": "docker-essentials",
-    "displayName": "Docker Essentials",
-    "summary": "Use essential Docker workflows for container management, image operations, and debugging.",
-    "category": "developer-tools",
-    "tags": ["coding", "docker", "infrastructure"]
+    "tags": [
+      "coding",
+      "tooling",
+      "automation",
+      "auto"
+    ]
   },
   {
     "slug": "api-gateway",
     "displayName": "API Gateway",
     "summary": "Connect to 100+ third-party APIs with managed OAuth and a single gateway workflow.",
     "category": "developer-tools",
-    "tags": ["integrations", "oauth", "apis"]
+    "tags": [
+      "integrations",
+      "oauth",
+      "apis"
+    ]
   },
   {
-    "slug": "gog",
-    "displayName": "Google Workspace",
-    "summary": "Automate Gmail, Calendar, Drive, Docs, and Sheets workflows.",
+    "slug": "skill-creator",
+    "displayName": "Skill Creator",
+    "summary": "Scaffold and refine new skills with consistent frontmatter and structure.",
     "category": "developer-tools",
-    "tags": ["integrations", "google", "workspace"]
+    "tags": [
+      "agent",
+      "authoring",
+      "templates"
+    ]
+  },
+  {
+    "slug": "codeconductor",
+    "displayName": "CodeConductor.ai",
+    "summary": "AI-powered platform for rapid full-stack app development, autonomous agents, workflow automation, and scalable product creation with.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "tooling",
+      "automation",
+      "codeconductor"
+    ]
   },
   {
     "slug": "mcporter",
     "displayName": "MCPorter",
     "summary": "Bridge and orchestrate MCP tools with clearer operator control.",
     "category": "developer-tools",
-    "tags": ["integrations", "mcp", "tooling"]
+    "tags": [
+      "integrations",
+      "mcp",
+      "tooling"
+    ]
+  },
+  {
+    "slug": "elite-longterm-memory",
+    "displayName": "Elite Longterm Memory",
+    "summary": "Ultimate AI agent memory system for Cursor, Claude, ChatGPT & Copilot.",
+    "category": "developer-tools",
+    "tags": [
+      "search",
+      "web",
+      "memory",
+      "github"
+    ]
+  },
+  {
+    "slug": "clawddocs",
+    "displayName": "Clawdbot Documentation Expert",
+    "summary": "Clawdbot documentation expert with decision tree navigation, search scripts, doc fetching, version tracking, and config snippets for.",
+    "category": "developer-tools",
+    "tags": [
+      "search",
+      "web",
+      "coding",
+      "tooling"
+    ]
+  },
+  {
+    "slug": "video-frames",
+    "displayName": "Video Frames",
+    "summary": "Extract and process key frames or clips from videos for review and analysis.",
+    "category": "developer-tools",
+    "tags": [
+      "media",
+      "video",
+      "frames"
+    ]
+  },
+  {
+    "slug": "browser-use",
+    "displayName": "Browser Use",
+    "summary": "Automate browser testing, form filling, screenshots, and structured data extraction.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "browser",
+      "testing"
+    ]
+  },
+  {
+    "slug": "agent-browser-clawdbot",
+    "displayName": "Agent Browser",
+    "summary": "Headless browser automation CLI optimized for AI agents with accessibility tree snapshots and ref-based element selection.",
+    "category": "developer-tools",
+    "tags": [
+      "browser",
+      "coding",
+      "tooling",
+      "automation"
+    ]
+  },
+  {
+    "slug": "model-usage",
+    "displayName": "Model Usage",
+    "summary": "Summarize CodexBar model-level usage and cost data for Codex or Claude.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "cost",
+      "observability"
+    ]
+  },
+  {
+    "slug": "blogwatcher",
+    "displayName": "Blogwatcher",
+    "summary": "Monitor blogs and RSS/Atom feeds for updates using the blogwatcher CLI.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "tooling",
+      "automation",
+      "blogwatcher"
+    ]
+  },
+  {
+    "slug": "moltspeak",
+    "displayName": "Molt Speak",
+    "summary": "Efficient, secure agent-to-agent communication protocol.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "tooling",
+      "automation",
+      "moltspeak"
+    ]
+  },
+  {
+    "slug": "playwright-mcp",
+    "displayName": "Playwright MCP",
+    "summary": "Run full browser automation workflows through a Playwright MCP server.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "playwright",
+      "automation"
+    ]
+  },
+  {
+    "slug": "clawdhub",
+    "displayName": "Clawdhub",
+    "summary": "Use the ClawdHub CLI to search, install, update, and publish agent skills from clawdhub.com.",
+    "category": "developer-tools",
+    "tags": [
+      "search",
+      "web",
+      "coding",
+      "tooling"
+    ]
+  },
+  {
+    "slug": "superdesign",
+    "displayName": "SuperDesign",
+    "summary": "Expert frontend design guidelines for creating beautiful, modern UIs.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "tooling",
+      "automation",
+      "superdesign"
+    ]
+  },
+  {
+    "slug": "browser-automation",
+    "displayName": "Browser Automation",
+    "summary": "Automate web browser interactions using natural language via CLI commands.",
+    "category": "developer-tools",
+    "tags": [
+      "browser",
+      "coding",
+      "tooling",
+      "automation"
+    ]
+  },
+  {
+    "slug": "qmd",
+    "displayName": "Qmd",
+    "summary": "Local search/indexing CLI (BM25 + vectors + rerank) with MCP mode.",
+    "category": "developer-tools",
+    "tags": [
+      "search",
+      "web",
+      "mcp",
+      "coding"
+    ]
+  },
+  {
+    "slug": "docker-essentials",
+    "displayName": "Docker Essentials",
+    "summary": "Use essential Docker workflows for container management, image operations, and debugging.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "docker",
+      "infrastructure"
+    ]
+  },
+  {
+    "slug": "n8n-workflow-automation",
+    "displayName": "n8n workflow automation",
+    "summary": "Designs and outputs n8n workflow JSON with robust triggers, idempotency, error handling, logging, retries, and human-in-the-loop.",
+    "category": "developer-tools",
+    "tags": [
+      "coding",
+      "tooling",
+      "automation",
+      "n8n"
+    ]
+  },
+  {
+    "slug": "agentmail",
+    "displayName": "AgentMail",
+    "summary": "API-first email platform designed for AI agents.",
+    "category": "developer-tools",
+    "tags": [
+      "email",
+      "security",
+      "coding",
+      "tooling"
+    ]
   }
 ]

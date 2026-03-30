@@ -4,20 +4,283 @@
     "displayName": "Find Skills",
     "summary": "Discover and install suitable skills for user goals and workflows.",
     "category": "data-analysis",
-    "tags": ["agent", "discovery", "marketplace"]
+    "tags": [
+      "agent",
+      "discovery",
+      "marketplace"
+    ]
+  },
+  {
+    "slug": "stock-analysis",
+    "displayName": "Stock Analysis",
+    "summary": "Analyze stocks and cryptocurrencies using Yahoo Finance data.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "security",
+      "data",
+      "analysis"
+    ]
   },
   {
     "slug": "markdown-converter",
     "displayName": "Markdown Converter",
     "summary": "Convert PDFs, Office files, HTML, images, audio, and web content into Markdown for downstream analysis.",
     "category": "data-analysis",
-    "tags": ["documents", "markdown", "conversion"]
+    "tags": [
+      "documents",
+      "markdown",
+      "conversion"
+    ]
+  },
+  {
+    "slug": "stock-market-pro",
+    "displayName": "Stock Market Pro",
+    "summary": "Yahoo Finance (yfinance) powered stock analysis skill: quotes, fundamentals, ASCII trends, high-resolution charts.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "stock-watcher",
+    "displayName": "Stock Watcher",
+    "summary": "Manage and monitor a personal stock watchlist with support for adding, removing, listing stocks, and summarizing their recent.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "session-logs",
+    "displayName": "Session-logs",
+    "summary": "Search and analyze your own session logs (older/parent conversations) using jq.",
+    "category": "data-analysis",
+    "tags": [
+      "search",
+      "web",
+      "data",
+      "analysis"
+    ]
   },
   {
     "slug": "data-analyst",
     "displayName": "Data Analyst",
     "summary": "Turn raw data into reports, visualizations, SQL queries, and spreadsheet automations.",
     "category": "data-analysis",
-    "tags": ["data", "analysis", "reporting"]
+    "tags": [
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "tushare-finance",
+    "displayName": "tushare-finance",
+    "summary": "Analyze market and financial data with tushare-finance.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "excel-xlsx",
+    "displayName": "Excel / XLSX",
+    "summary": "Create, inspect, and edit Microsoft Excel workbooks and XLSX files with reliable formulas, dates, types, formatting, recalculation,.",
+    "category": "data-analysis",
+    "tags": [
+      "documents",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "firecrawl-search",
+    "displayName": "Firecrawl Search",
+    "summary": "Web search and scraping via Firecrawl API.",
+    "category": "data-analysis",
+    "tags": [
+      "search",
+      "web",
+      "data",
+      "analysis"
+    ]
+  },
+  {
+    "slug": "yahoo-finance",
+    "displayName": "Yahoo Finance",
+    "summary": "Get stock prices, quotes, fundamentals, earnings, options, dividends, and analyst ratings using Yahoo Finance.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "data-analysis",
+    "displayName": "Data Analysis",
+    "summary": "Data analysis and visualization.",
+    "category": "data-analysis",
+    "tags": [
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "us-stock-analysis",
+    "displayName": "Us Stock Analysis",
+    "summary": "Comprehensive US stock analysis including fundamental analysis (financial metrics, business quality, valuation), technical analysis.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "academic-deep-research",
+    "displayName": "Academic Deep Research",
+    "summary": "Transparent, rigorous research with full methodology — not a black-box API wrapper.",
+    "category": "data-analysis",
+    "tags": [
+      "data",
+      "analysis",
+      "reporting",
+      "academic"
+    ]
+  },
+  {
+    "slug": "akshare-stock",
+    "displayName": "A股量化 AkShare",
+    "summary": "Analyze market and financial data with A股量化 AkShare.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "a-stock-analysis",
+    "displayName": "A Stock Analysis",
+    "summary": "Analyze market and financial data with A Stock Analysis.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "polymarket-odds",
+    "displayName": "Polymarket Odds",
+    "summary": "Query Polymarket prediction market odds and events via CLI.",
+    "category": "data-analysis",
+    "tags": [
+      "search",
+      "web",
+      "finance",
+      "data"
+    ]
+  },
+  {
+    "slug": "google-sheets",
+    "displayName": "Google Sheets",
+    "summary": "Google Sheets API integration with managed OAuth.",
+    "category": "data-analysis",
+    "tags": [
+      "data",
+      "analysis",
+      "reporting",
+      "google"
+    ]
+  },
+  {
+    "slug": "stock-info-explorer",
+    "displayName": "Stock Info Explorer",
+    "summary": "A Yahoo Finance (yfinance) powered financial analysis tool.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "pdf-text-extractor",
+    "displayName": "PDF Text Extractor",
+    "summary": "Extract text from PDFs with OCR support.",
+    "category": "data-analysis",
+    "tags": [
+      "documents",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "stock-monitor-skill",
+    "displayName": "Stock Monitor",
+    "summary": "Analyze market and financial data with Stock Monitor.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "finance",
+    "displayName": "finance",
+    "summary": "Track stocks, ETFs, indices, crypto (where available), and FX pairs with caching + provider fallbacks.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "technical-analyst",
+    "displayName": "Technical Analyst",
+    "summary": "This skill should be used when analyzing weekly price charts for stocks, stock indices, cryptocurrencies, or forex pairs.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
+  },
+  {
+    "slug": "market-research",
+    "displayName": "Market Research",
+    "summary": "Research markets with sizing, segmentation, competitor mapping, pricing checks, and demand validation that turn fuzzy ideas into.",
+    "category": "data-analysis",
+    "tags": [
+      "finance",
+      "data",
+      "analysis",
+      "reporting"
+    ]
   }
 ]

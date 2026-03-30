@@ -33,7 +33,7 @@ export function EditorPageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className="border-b border-border pl-6 pr-20 py-5">
+    <div className="pl-6 pr-20 py-5">
       <div className="flex flex-wrap items-start gap-3">
         <Button variant="ghost" size="icon" onClick={onBack} aria-label={backLabel}>
           <ArrowLeft className="h-4 w-4" />
@@ -116,7 +116,7 @@ export function BuilderStepGrid({
 
 export function EditorContentFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[28px] border border-border bg-card/70 p-5 shadow-sm">
+    <div className="rounded-[30px] p-4">
       {children}
     </div>
   )
@@ -141,7 +141,7 @@ export function Field({
 }) {
   return (
     <label className="block space-y-2">
-      <span className="text-sm font-medium">
+      <span className="text-base font-semibold">
         {label}
         {required && <span className="ml-1 text-red-400">*</span>}
       </span>
@@ -224,13 +224,25 @@ export function IntegerStepperInput({
   )
 }
 
-export function SectionCard({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+export function SectionCard({
+  title,
+  titleClassName,
+  description,
+  children,
+}: {
+  title?: string
+  titleClassName?: string
+  description?: string
+  children: ReactNode
+}) {
   return (
-    <section className="rounded-3xl border border-border bg-background/60 p-5">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-      </div>
+    <section className="rounded-[30px] p-4">
+      {(title || description) && (
+        <div className="mb-5 space-y-1">
+          {title && <h2 className={cn('text-lg font-semibold', titleClassName)}>{title}</h2>}
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        </div>
+      )}
       {children}
     </section>
   )
@@ -268,7 +280,7 @@ export function MarkdownPreview({
       ref={containerRef}
       className={cn(
         scrollable && 'max-h-[560px] overflow-auto',
-        plain ? '' : 'rounded-2xl border border-border bg-background/70 p-4',
+        plain ? '' : 'rounded-[24px] border border-border/60 bg-background/80 p-4 shadow-sm',
       )}
     >
       <MessageResponse

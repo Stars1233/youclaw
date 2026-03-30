@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { bumpDraftVersion, normalizeSlug, stringifySkillMarkdownLocal } from '@/components/skills/authoring-helpers'
 import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
 import { notify } from '@/stores/app'
 import { CheckCircle2, PencilLine, Rocket, Trash2 } from 'lucide-react'
 
@@ -31,6 +32,19 @@ interface SkillEditorProps {
   onBack: () => void
   onSkillSelected: (name: string | null) => void
   onSkillsChanged: () => void
+}
+
+type BindingViewState = 'bound' | 'wildcard' | 'unbound'
+type BindingRow = {
+  id: string
+  name: string
+  state: 'bound' | 'bound_via_wildcard' | 'unbound'
+  selected: boolean
+}
+
+function resolveBindingViewState(binding: BindingRow): BindingViewState {
+  if (binding.state === 'bound_via_wildcard') return 'wildcard'
+  return binding.selected ? 'bound' : 'unbound'
 }
 
 function createEmptyDraft(locale: 'en' | 'zh'): SkillAuthoringDraft {
@@ -81,6 +95,7 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [activeSkillName, setActiveSkillName] = useState<string | null>(mode === 'edit' ? (skillName ?? null) : null)
   const [selectedBindingIds, setSelectedBindingIds] = useState<string[]>([])
+  const [bindingSearchQuery, setBindingSearchQuery] = useState('')
 
   useEffect(() => {
     setActiveSkillName(mode === 'edit' ? (skillName ?? null) : null)
@@ -169,7 +184,7 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
 
   const frontmatter = draft.frontmatter
   const isCreateMode = !activeSkillName
-  const bindingRows = useMemo(() => {
+  const bindingRows = useMemo<BindingRow[]>(() => {
     const detailById = new Map((detail?.bindingStates ?? []).map((binding) => [binding.id, binding]))
     const selectedSet = new Set(selectedBindingIds)
     const agentMap = new Map(availableAgents.map((agent) => [agent.id, agent.name]))
@@ -193,6 +208,16 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
 
     return base.sort((left, right) => left.name.localeCompare(right.name))
   }, [availableAgents, detail?.bindingStates, selectedBindingIds])
+
+  const visibleBindingRows = useMemo(() => {
+    const query = bindingSearchQuery.trim().toLowerCase()
+
+    return bindingRows.filter((binding) => {
+      if (!query) return true
+
+      return binding.name.toLowerCase().includes(query)
+    })
+  }, [bindingRows, bindingSearchQuery])
 
   const updateFrontmatter = useCallback(<K extends keyof SkillAuthoringDraft['frontmatter']>(key: K, value: SkillAuthoringDraft['frontmatter'][K]) => {
     setDraft((current) => {
@@ -258,7 +283,8 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
     return created.skill.name
   }, [activeSkillName, locale, onSkillSelected, onSkillsChanged, t.skills.fieldName, validateCurrentDraft])
 
-  const handleSaveDraft = useCallback(async () => {
+  const handleSaveDraft = useCallback(async ({ showToast = true }: { showToast?: boolean } = {}) => {
+    const creatingSkill = !activeSkillName
     setSaving(true)
     setError('')
     try {
@@ -272,13 +298,42 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
         setDirty(false)
       }
       onSkillsChanged()
+      if (showToast) {
+        if (creatingSkill) {
+          notify.success(formatSkillMessage(t.skills.skillCreateSuccess, response.skill.name))
+        } else {
+          notify.success(t.skills.draftSaveSuccess)
+        }
+      }
       return response
     } catch (nextError) {
+      const fallback = creatingSkill
+        ? formatSkillMessage(t.skills.skillCreateFailed, draft.frontmatter.name?.trim() || t.skills.newSkill)
+        : t.skills.draftSaveFailed
+      const message = getOperationErrorMessage(nextError, fallback)
+      setError(message)
+      if (showToast) {
+        notify.error(message)
+      }
       throw nextError
     } finally {
       setSaving(false)
     }
-  }, [buildValidationPayload, ensureSkillProject, initializeDraft, onSkillsChanged])
+  }, [
+    activeSkillName,
+    buildValidationPayload,
+    draft.frontmatter.name,
+    ensureSkillProject,
+    formatSkillMessage,
+    getOperationErrorMessage,
+    initializeDraft,
+    onSkillsChanged,
+    t.skills.draftSaveFailed,
+    t.skills.draftSaveSuccess,
+    t.skills.newSkill,
+    t.skills.skillCreateFailed,
+    t.skills.skillCreateSuccess,
+  ])
 
   const handlePublish = useCallback(async () => {
     setPublishing(true)
@@ -286,7 +341,7 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
     try {
       let nextSkillName = activeSkillName
       if (dirty || !nextSkillName) {
-        const saved = await handleSaveDraft()
+        const saved = await handleSaveDraft({ showToast: false })
         nextSkillName = saved.skill.name
       }
       if (!nextSkillName) {
@@ -308,7 +363,9 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
       await loadSkill(published.skill.name)
       notify.success(formatSkillMessage(t.skills.skillPublishSuccess, published.skill.name))
     } catch (nextError) {
-      notify.error(getOperationErrorMessage(nextError, t.skills.skillPublishFailed))
+      const message = getOperationErrorMessage(nextError, t.skills.skillPublishFailed)
+      setError(message)
+      notify.error(message)
     } finally {
       setPublishing(false)
     }
@@ -316,7 +373,6 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
     activeSkillName,
     bindingRows,
     dirty,
-    formatSkillMessage,
     getOperationErrorMessage,
     handleSaveDraft,
     loadSkill,
@@ -325,13 +381,11 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
     selectedBindingIds,
     t.skills.publishBeforeBind,
     t.skills.skillPublishFailed,
-    t.skills.skillPublishSuccess,
   ])
 
   const handleDiscardDraft = useCallback(async () => {
     if (!activeSkillName) {
       initializeDraft(createEmptyDraft(locale), { markDirty: false })
-      notify.success(t.skills.draftDiscardSuccess)
       return
     }
 
@@ -354,9 +408,11 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
       onSkillsChanged()
       notify.success(t.skills.draftDiscardSuccess)
     } catch (nextError) {
-      notify.error(getOperationErrorMessage(nextError, t.skills.draftDiscardFailed))
+      const message = getOperationErrorMessage(nextError, t.skills.draftDiscardFailed)
+      setError(message)
+      notify.error(message)
     }
-  }, [activeSkillName, getOperationErrorMessage, initializeDraft, locale, onSkillsChanged, t.skills.draftDiscardFailed, t.skills.draftDiscardSuccess])
+  }, [activeSkillName, getOperationErrorMessage, initializeDraft, locale, onSkillsChanged, t.skills.draftDiscardFailed])
 
   const handleDelete = useCallback(async () => {
     if (!activeSkillName) {
@@ -367,24 +423,23 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
 
     setDeleting(true)
     try {
-      const deletedSkillName = activeSkillName
       await deleteManagedSkill(activeSkillName)
       setDeleteOpen(false)
       onSkillsChanged()
       onSkillSelected(null)
       onBack()
-      notify.success(formatSkillMessage(t.skills.skillDeleteSuccess, deletedSkillName))
+      notify.success(formatSkillMessage(t.skills.skillDeleteSuccess, activeSkillName))
     } catch (nextError) {
-      notify.error(
-        getOperationErrorMessage(
-          nextError,
-          formatSkillMessage(t.skills.skillDeleteFailed, activeSkillName),
-        ),
+      const message = getOperationErrorMessage(
+        nextError,
+        formatSkillMessage(t.skills.skillDeleteFailed, activeSkillName),
       )
+      setError(message)
+      notify.error(message)
     } finally {
       setDeleting(false)
     }
-  }, [activeSkillName, formatSkillMessage, getOperationErrorMessage, onBack, onSkillSelected, onSkillsChanged, t.skills.skillDeleteFailed, t.skills.skillDeleteSuccess])
+  }, [activeSkillName, formatSkillMessage, getOperationErrorMessage, onBack, onSkillSelected, onSkillsChanged, t.skills.skillDeleteFailed])
 
   const handleDraftBindingToggle = useCallback((agentId: string, checked: boolean) => {
     setSelectedBindingIds((current) => {
@@ -404,8 +459,6 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
     onBack()
   }, [dirty, onBack])
 
-  const resolvedDraft = useMemo(() => validation?.draft ?? draft, [draft, validation?.draft])
-  const currentVersion = frontmatter.version?.trim() || '1'
   const titleStatus = isCreateMode || dirty || detail?.skill.hasDraft
     ? {
         icon: <PencilLine className="h-4 w-4" />,
@@ -420,7 +473,7 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
     ? t.skills.createSkillTitle
     : (detail?.skill.name ?? activeSkillName ?? t.skills.editSkillTitle)
   const headerDescription = isCreateMode
-    ? t.skills.createSkillBody
+    ? undefined
     : (frontmatter.description || detail?.skill.description || t.skills.builderEditHint)
 
   if (loading) {
@@ -437,7 +490,6 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
           {titleStatus.icon}
         </div>
       )}
-      badges={<Badge variant="outline">v{currentVersion}</Badge>}
       description={headerDescription}
       actions={(
         <>
@@ -502,63 +554,107 @@ export function SkillEditor({ mode, skillName, onBack, onSkillSelected, onSkills
       )}
     >
       <div className="space-y-6">
-        <SectionCard title={t.skills.stageDefineTitle} description={t.skills.stageDefineBody}>
+        <SectionCard>
           <div className="space-y-4">
             <Field label={t.skills.fieldName} required>
-              <Input value={frontmatter.name} onChange={(event) => updateFrontmatter('name', event.target.value)} />
+              <Input
+                value={frontmatter.name}
+                onChange={(event) => updateFrontmatter('name', event.target.value)}
+                className="shadow-none"
+              />
             </Field>
             <Field label={t.skills.fieldDescription} required>
               <Textarea
-                rows={5}
+                rows={3}
                 value={frontmatter.description}
                 onChange={(event) => updateFrontmatter('description', event.target.value)}
-                className="min-h-[136px] resize-y"
+                className="min-h-[72px] resize-y shadow-none"
               />
             </Field>
           </div>
         </SectionCard>
 
         <MarkdownAuthoringEditor
-          title={resolvedDraft.frontmatter.name || frontmatter.name || detail?.skill.name || t.skills.newSkill}
-          version={resolvedDraft.frontmatter.version?.trim() || currentVersion}
-          description={resolvedDraft.frontmatter.description || frontmatter.description}
+          title={t.skills.skillDetails}
           value={draft.content}
           onChange={updateContent}
         />
 
-        <SectionCard title={t.skills.stageBindingTitle} description={t.skills.stageBindingBody}>
-          <div className="space-y-3">
-            {bindingRows.map((binding) => (
-              <div key={binding.id} className="flex flex-col gap-4 rounded-2xl border border-border bg-background/70 px-4 py-4 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-3">
-                      <Checkbox
-                        checked={binding.selected}
-                        disabled={binding.state === 'bound_via_wildcard'}
-                        onCheckedChange={(checked) => {
-                          if (binding.state === 'bound_via_wildcard') return
-                          handleDraftBindingToggle(binding.id, checked === true)
-                        }}
-                      />
-                      <span className="font-medium">{binding.name}</span>
-                    </label>
-                    <Badge variant={binding.state === 'bound_via_wildcard' || binding.selected ? 'secondary' : 'outline'}>
-                      {binding.state === 'bound_via_wildcard'
-                        ? t.skills.boundViaWildcard
-                        : binding.selected
-                          ? t.skills.bound
-                          : t.skills.unbound}
-                    </Badge>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{binding.id}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+        <SectionCard title={t.skills.stageBindingTitle} titleClassName="text-base font-semibold">
           {bindingRows.length === 0 && (
             <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
               {t.skills.bindingEmpty}
+            </div>
+          )}
+          {bindingRows.length > 0 && (
+            <div className="space-y-3">
+              <div>
+                <Input
+                  value={bindingSearchQuery}
+                  onChange={(event) => setBindingSearchQuery(event.target.value)}
+                  placeholder={t.skills.bindingSearchPlaceholder}
+                  className="h-9 w-full max-w-md shadow-none"
+                />
+              </div>
+
+              {visibleBindingRows.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
+                  {t.skills.bindingNoResults}
+                </div>
+              ) : (
+                <div className="rounded-[24px] border border-border/60 bg-background/80">
+                  <div className="max-h-72 overflow-y-auto">
+                    <div className="divide-y divide-border/50">
+                      {visibleBindingRows.map((binding) => {
+                        const bindingViewState = resolveBindingViewState(binding)
+                        return (
+                          <div
+                            key={binding.id}
+                            role={bindingViewState === 'wildcard' ? 'group' : 'button'}
+                            tabIndex={bindingViewState === 'wildcard' ? -1 : 0}
+                            className={cn(
+                              'flex items-start gap-3 px-4 py-3 transition-colors',
+                              bindingViewState === 'wildcard'
+                                ? 'cursor-default'
+                                : 'cursor-pointer hover:bg-muted/35',
+                            )}
+                            onClick={() => {
+                              if (bindingViewState === 'wildcard') return
+                              handleDraftBindingToggle(binding.id, !binding.selected)
+                            }}
+                            onKeyDown={(event) => {
+                              if (bindingViewState === 'wildcard') return
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault()
+                                handleDraftBindingToggle(binding.id, !binding.selected)
+                              }
+                            }}
+                          >
+                            <Checkbox
+                              checked={binding.selected}
+                              disabled={bindingViewState === 'wildcard'}
+                              tabIndex={-1}
+                              className="pointer-events-none mt-0.5"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium">{binding.name}</span>
+                                <Badge variant={bindingViewState === 'unbound' ? 'outline' : 'secondary'}>
+                                  {bindingViewState === 'wildcard'
+                                    ? t.skills.boundViaWildcard
+                                    : bindingViewState === 'bound'
+                                      ? t.skills.bound
+                                      : t.skills.unbound}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </SectionCard>

@@ -77,8 +77,8 @@ export function AuthoringShell({
         actions={actions}
       />
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="mx-auto max-w-5xl space-y-6">
           {error && <ErrorBanner message={error} />}
           {stepsContent ?? (
             <BuilderStepGrid

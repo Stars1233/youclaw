@@ -42,7 +42,7 @@ import {
   getRegistrySourceInfo,
   resolveMarketplaceSort,
 } from '@/lib/registry-source'
-import { notify, useAppRuntimeStore } from '@/stores/app'
+import { notify, useAppPreferencesStore, useAppRuntimeStore } from '@/stores/app'
 
 type TabType = 'installed' | 'marketplace'
 type InstalledWorkspace =
@@ -51,6 +51,8 @@ type InstalledWorkspace =
 
 export function Skills() {
   const { t, locale } = useI18n()
+  const skillsViewMode = useAppPreferencesStore((state) => state.skillsViewMode)
+  const setSkillsViewMode = useAppPreferencesStore((state) => state.setSkillsViewMode)
   const registrySource = useAppRuntimeStore((state) => state.registrySource)
   const registrySources = useAppRuntimeStore((state) => state.registrySources)
   const setRegistrySource = useAppRuntimeStore((state) => state.setRegistrySource)
@@ -116,7 +118,12 @@ export function Skills() {
   const formatSkillMessage = useCallback((template: string, skillName: string) => (
     template.replace('{name}', skillName)
   ), [])
-
+  const formatActionError = useCallback((error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message) {
+      return error.message
+    }
+    return fallback
+  }, [])
   const refreshInstalledData = useCallback(async () => {
     const [nextSkills, nextMySkills] = await Promise.all([getSkills(), getMySkills()])
     setSkills(nextSkills)
@@ -345,22 +352,18 @@ export function Skills() {
           onToggleSkill={async (skillName, enabled) => {
             try {
               await toggleSkill(skillName, enabled)
-              await refreshInstalledData()
-              notify.success(
-                formatSkillMessage(
-                  enabled ? t.skills.skillEnabledSuccess : t.skills.skillDisabledSuccess,
-                  skillName,
-                ),
-              )
+              if (enabled) {
+                notify.success(formatSkillMessage(t.skills.skillEnabledSuccess, skillName))
+              } else {
+                notify.success(formatSkillMessage(t.skills.skillDisabledSuccess, skillName))
+              }
+              await refreshInstalledData().catch(() => {})
             } catch (error) {
-              notify.error(
-                error instanceof Error && error.message
-                  ? error.message
-                  : formatSkillMessage(
-                    enabled ? t.skills.skillEnableFailed : t.skills.skillDisableFailed,
-                    skillName,
-                  ),
-              )
+              notify.error(formatActionError(
+                error,
+                formatSkillMessage(enabled ? t.skills.skillEnableFailed : t.skills.skillDisableFailed, skillName),
+              ))
+              return
             }
           }}
           onDeleteSkill={(skillName) => setDeleteTarget(skillName)}
@@ -368,6 +371,8 @@ export function Skills() {
             void refreshInstalledData()
           }}
           workspaceContent={installedWorkspaceContent}
+          viewMode={skillsViewMode}
+          onViewModeChange={setSkillsViewMode}
         />
       )}
 
@@ -393,6 +398,8 @@ export function Skills() {
             void loadMoreMarketplace()
           }}
           listKey={marketplaceListKey}
+          viewMode={skillsViewMode}
+          onViewModeChange={setSkillsViewMode}
         />
       )}
 
@@ -404,7 +411,7 @@ export function Skills() {
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent
-          className="h-[min(92vh,960px)] w-[min(96vw,1200px)] max-w-6xl overflow-hidden rounded-[28px] border border-border/70 bg-background p-0 shadow-2xl"
+          className="h-[min(92vh,960px)] w-[min(96vw,1200px)] max-w-6xl overflow-hidden rounded-[28px] border border-border/50 bg-background p-0 shadow-none"
           onPointerDownOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
@@ -460,16 +467,14 @@ export function Skills() {
                 try {
                   await deleteSkill(skillName)
                   setInstalledWorkspace({ kind: 'detail', skillName: null })
-                  await refreshInstalledData()
                   notify.success(formatSkillMessage(t.skills.skillDeleteSuccess, skillName))
+                  await refreshInstalledData().catch(() => {})
                 } catch (error) {
-                  notify.error(
-                    error instanceof Error && error.message
-                      ? error.message
-                      : formatSkillMessage(t.skills.skillDeleteFailed, skillName),
-                  )
+                  notify.error(formatActionError(error, formatSkillMessage(t.skills.skillDeleteFailed, skillName)))
+                  return
+                } finally {
+                  closeDeleteDialog()
                 }
-                closeDeleteDialog()
               }}
             >
               {t.common.delete}

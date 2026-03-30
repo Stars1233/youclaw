@@ -24,6 +24,26 @@ import {
 } from 'lucide-react'
 import type { InstalledSkillListItem } from './skills-view-types'
 
+function getActionErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  if (typeof error === 'string' && error) {
+    return error
+  }
+
+  return fallback
+}
+
+function getInstallFailureMessage(message: string | undefined, fallback: string) {
+  if (message && message.trim()) {
+    return message
+  }
+
+  return fallback
+}
+
 export function EligibilityIcon({ skill }: { skill: Skill }) {
   if (!skill.enabled) {
     return <XCircle className="h-4 w-4 text-muted-foreground" />
@@ -125,8 +145,6 @@ export function EnvConfigRow({ envName, configured, onSaved }: { envName: string
   const [value, setValue] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving'>('idle')
 
-  const formatMessage = (template: string) => template.replace('{key}', envName)
-
   const handleSave = async () => {
     if (!value.trim()) return
     setStatus('saving')
@@ -136,14 +154,10 @@ export function EnvConfigRow({ envName, configured, onSaved }: { envName: string
       setEditing(false)
       setValue('')
       onSaved()
-      notify.success(formatMessage(t.skills.envSaveSuccess))
+      notify.success(t.skills.envSaveSuccess.replace('{key}', envName))
     } catch (error) {
       setStatus('idle')
-      notify.error(
-        error instanceof Error && error.message
-          ? error.message
-          : formatMessage(t.skills.envSaveFailed),
-      )
+      notify.error(getActionErrorMessage(error, t.skills.envSaveFailed.replace('{key}', envName)))
     }
   }
 
@@ -221,15 +235,15 @@ export function InstallButton({ method, command, skillName, onInstalled }: { met
       const result = await installSkill(skillName, method)
       if (result.ok) {
         setStatus('idle')
-        onInstalled()
         notify.success(t.skills.installSuccess)
+        onInstalled()
       } else {
         setStatus('idle')
-        notify.error(result.stderr || `${t.skills.exitCodeLabel}: ${result.exitCode}`)
+        notify.error(getInstallFailureMessage(result.stderr, t.skills.installFailed))
       }
     } catch (error) {
       setStatus('idle')
-      notify.error(error instanceof Error && error.message ? error.message : t.skills.installFailed)
+      notify.error(getActionErrorMessage(error, t.skills.installFailed))
     }
   }
 
@@ -242,7 +256,6 @@ export function InstallButton({ method, command, skillName, onInstalled }: { met
           onClick={handleCopy}
           className="shrink-0 p-1.5 rounded-md hover:bg-accent transition-colors"
           aria-label={t.common.copy}
-          title={t.common.copy}
         >
           {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
         </button>
@@ -289,33 +302,6 @@ export function SectionTitle({ icon, children }: { icon: ReactNode; children: Re
 }
 
 /**
- * Map executable names (from skill dependencies) to env tool names (from /api/install-tool).
- * If a dependency can be installed via the environment module, we show a one-click install button.
- */
-const DEP_TO_ENV_TOOL: Record<string, string> = {
-  uv: 'uv',
-  uvx: 'uv',       // uvx is part of the uv package
-  python: 'python',
-  python3: 'python',
-  bun: 'bun',
-  git: 'git',
-  node: 'node',
-}
-
-/**
- * Resolve which env tools are needed for a list of missing skill dependencies.
- * Returns deduplicated list of env tool names that can be installed via /api/install-tool.
- */
-export function resolveEnvTools(missingDeps: string[]): string[] {
-  const tools = new Set<string>()
-  for (const dep of missingDeps) {
-    const tool = DEP_TO_ENV_TOOL[dep]
-    if (tool) tools.add(tool)
-  }
-  return Array.from(tools)
-}
-
-/**
  * One-click install button for env-managed tools (uv, bun, git, python).
  * Reuses the /api/install-tool endpoint with CDN download support.
  */
@@ -331,16 +317,13 @@ export function EnvToolInstallButton({ tool, onInstalled }: { tool: string; onIn
         notify.success(`${tool} ${t.envSetup.installSuccess}`)
         onInstalled()
       } else {
-        notify.error(result.stderr || t.envSetup.installFailed, {
-          durationMs: 6000,
-        })
+        notify.error(result.stderr || t.envSetup.installFailed, { durationMs: 6000 })
       }
-    } catch (err) {
-      notify.error(err instanceof Error ? err.message : t.envSetup.installFailed, {
-        durationMs: 6000,
-      })
+    } catch (error) {
+      notify.error(getActionErrorMessage(error, t.envSetup.installFailed), { durationMs: 6000 })
+    } finally {
+      setStatus('idle')
     }
-    setStatus('idle')
   }
 
   return (

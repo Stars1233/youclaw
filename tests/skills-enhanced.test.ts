@@ -157,6 +157,31 @@ import { SkillsLoader } from '../src/skills/loader.ts'
 initDatabase()
 
 describe('SkillsLoader.getAgentSkillsView', () => {
+  test('keeps project skills on disk as builtin runtime skills', () => {
+    const loader = new SkillsLoader()
+    const skillName = `runtime-source-${Date.now()}`
+    const skillDir = resolve(process.cwd(), 'skills', skillName)
+
+    mkdirSync(skillDir, { recursive: true })
+    writeFileSync(resolve(skillDir, 'SKILL.md'), `---\nname: ${skillName}\ndescription: Runtime source test\n---\nbody\n`)
+    writeFileSync(resolve(skillDir, '.youclaw-skill.json'), JSON.stringify({
+      schemaVersion: 1,
+      managed: false,
+      origin: 'imported',
+      createdAt: '2026-03-30T00:00:00.000Z',
+      updatedAt: '2026-03-30T00:00:00.000Z',
+    }, null, 2), 'utf-8')
+
+    try {
+      const allSkills = loader.refresh()
+      const imported = allSkills.find((skill) => skill.name === skillName)
+      expect(imported?.source).toBe('builtin')
+    } finally {
+      rmSync(skillDir, { recursive: true, force: true })
+      loader.refresh()
+    }
+  })
+
   test('returns all available skills but no enabled bindings when no skills field is specified', () => {
     const loader = new SkillsLoader()
     const allSkills = loader.loadAllSkills()

@@ -4,13 +4,285 @@
     "displayName": "Summarize",
     "summary": "Summarize long documents and media into concise actionable takeaways.",
     "category": "content-creation",
-    "tags": ["documents", "summary", "analysis"]
+    "tags": [
+      "documents",
+      "summary",
+      "analysis"
+    ]
+  },
+  {
+    "slug": "humanizer",
+    "displayName": "Humanizer",
+    "summary": "Remove signs of AI-generated writing from text.",
+    "category": "content-creation",
+    "tags": [
+      "content",
+      "media",
+      "publishing",
+      "humanizer"
+    ]
+  },
+  {
+    "slug": "video-generator-seedance",
+    "displayName": "video-generator-seedance",
+    "summary": "Create, transform, and analyze video workflows with video-generator-seedance.",
+    "category": "content-creation",
+    "tags": [
+      "video",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "humanize-ai-text",
+    "displayName": "Humanize AI text",
+    "summary": "Humanize AI-generated text to bypass detection.",
+    "category": "content-creation",
+    "tags": [
+      "content",
+      "media",
+      "publishing",
+      "humanize"
+    ]
+  },
+  {
+    "slug": "admapix",
+    "displayName": "AdMapix",
+    "summary": "Ad creative search assistant.",
+    "category": "content-creation",
+    "tags": [
+      "search",
+      "web",
+      "marketing",
+      "content"
+    ]
   },
   {
     "slug": "youtube-api-skill",
     "displayName": "YouTube",
     "summary": "Search videos, manage playlists, and work with channel data through the YouTube API.",
     "category": "content-creation",
-    "tags": ["media", "youtube", "api"]
+    "tags": [
+      "media",
+      "youtube",
+      "api"
+    ]
+  },
+  {
+    "slug": "marketing-mode",
+    "displayName": "Marketing Mode",
+    "summary": "Marketing Mode combines 23 comprehensive marketing skills covering strategy, psychology, content, SEO, conversion optimization, and.",
+    "category": "content-creation",
+    "tags": [
+      "marketing",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "ai-ppt-generator",
+    "displayName": "Ai Ppt Generator",
+    "summary": "Generate PPT with Baidu AI.",
+    "category": "content-creation",
+    "tags": [
+      "search",
+      "web",
+      "documents",
+      "content"
+    ]
+  },
+  {
+    "slug": "marketing-skills",
+    "displayName": "Marketing Skills",
+    "summary": "Access 23 marketing modules offering checklists, frameworks, and ready-to-use deliverables for CRO, SEO, copywriting, analytics,.",
+    "category": "content-creation",
+    "tags": [
+      "marketing",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "remotion-video-toolkit",
+    "displayName": "Remotion Video Toolkit",
+    "summary": "Complete toolkit for programmatic video creation with Remotion + React.",
+    "category": "content-creation",
+    "tags": [
+      "video",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "youtube-transcript",
+    "displayName": "YouTube Transcript",
+    "summary": "Fetch and summarize YouTube video transcripts.",
+    "category": "content-creation",
+    "tags": [
+      "video",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "klaviyo",
+    "displayName": "Klaviyo",
+    "summary": "Klaviyo API integration with managed OAuth.",
+    "category": "content-creation",
+    "tags": [
+      "marketing",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "ppt-generator",
+    "displayName": "PPT Generator",
+    "summary": "Create, convert, and inspect documents with PPT Generator.",
+    "category": "content-creation",
+    "tags": [
+      "documents",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "edge-tts",
+    "displayName": "Edge TTS",
+    "summary": "Text-to-speech conversion using node-edge-tts npm package for generating audio from text.",
+    "category": "content-creation",
+    "tags": [
+      "audio",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "larry",
+    "displayName": "Larry",
+    "summary": "Automate TikTok slideshow marketing for any app or product.",
+    "category": "content-creation",
+    "tags": [
+      "video",
+      "marketing",
+      "content",
+      "media"
+    ]
+  },
+  {
+    "slug": "copywriting",
+    "displayName": "Copywriting",
+    "summary": "Write persuasive copy for landing pages, emails, ads, sales pages, and marketing materials.",
+    "category": "content-creation",
+    "tags": [
+      "email",
+      "marketing",
+      "content",
+      "media"
+    ]
+  },
+  {
+    "slug": "image",
+    "displayName": "Image",
+    "summary": "Create, inspect, process, and optimize image files and visual assets with reliable format choice, resizing, compression,.",
+    "category": "content-creation",
+    "tags": [
+      "image",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "youtube-full",
+    "displayName": "Youtube Full",
+    "summary": "Complete YouTube toolkit — transcripts, search, channels, playlists, and metadata all in one skill.",
+    "category": "content-creation",
+    "tags": [
+      "search",
+      "web",
+      "video",
+      "content"
+    ]
+  },
+  {
+    "slug": "linkedin-api",
+    "displayName": "LinkedIn",
+    "summary": "LinkedIn API integration with managed OAuth.",
+    "category": "content-creation",
+    "tags": [
+      "marketing",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "image-cog",
+    "displayName": "image-cog",
+    "summary": "AI image generation powered by CellCog.",
+    "category": "content-creation",
+    "tags": [
+      "image",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "upload-post",
+    "displayName": "Upload Post",
+    "summary": "Upload content to social media platforms via Upload-Post API.",
+    "category": "content-creation",
+    "tags": [
+      "video",
+      "marketing",
+      "chat",
+      "content"
+    ]
+  },
+  {
+    "slug": "video-transcript-downloader",
+    "displayName": "Video Transcript Downloader",
+    "summary": "Download videos, audio, subtitles, and clean paragraph-style transcripts from YouTube and any other yt-dlp supported site.",
+    "category": "content-creation",
+    "tags": [
+      "video",
+      "audio",
+      "content",
+      "media"
+    ]
+  },
+  {
+    "slug": "copywriter",
+    "displayName": "copywriter",
+    "summary": "Write compelling UX copy, marketing content, and product messaging.",
+    "category": "content-creation",
+    "tags": [
+      "marketing",
+      "content",
+      "media",
+      "publishing"
+    ]
+  },
+  {
+    "slug": "arxiv-watcher",
+    "displayName": "ArXiv Watcher",
+    "summary": "Search and summarize papers from ArXiv.",
+    "category": "content-creation",
+    "tags": [
+      "search",
+      "web",
+      "content",
+      "media"
+    ]
   }
 ]

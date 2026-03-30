@@ -117,15 +117,14 @@ export function SkillUrlImportDialog({
 
       const nextSuggestedName = nextProbeResult.suggestedName?.trim() || ''
       if (nextSuggestedName && existingSkillNameSet.has(nextSuggestedName)) {
-        const message = t.skills.importSkillAlreadyExists.replace('{name}', nextSuggestedName)
-        notify.error(message)
+        setActionError(t.skills.importSkillAlreadyExists.replace('{name}', nextSuggestedName))
         return
       }
 
       await runImport(normalizedUrl, importMode)
       await onImported()
-      onOpenChange(false)
       notify.success(t.skills.importSuccess)
+      onOpenChange(false)
     } catch (error) {
       const message = getMappedImportErrorMessage(importMode, error, t)
       setActionError(message)
@@ -149,7 +148,7 @@ export function SkillUrlImportDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(92vw,760px)] max-w-3xl overflow-hidden rounded-[28px] border border-border/70 bg-background p-0 shadow-2xl">
-        <DialogHeader className="border-b border-border/70 px-8 py-7 text-left">
+        <DialogHeader className="px-8 py-7 text-left">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <div className="space-y-1">
@@ -167,11 +166,10 @@ export function SkillUrlImportDialog({
           </div>
         </DialogHeader>
 
-        <div className="max-h-[70vh] overflow-y-auto px-8 pt-24 pb-7">
+        <div className="max-h-[70vh] overflow-y-auto px-8 pt-2 pb-7">
           <div className="space-y-6">
             <div className="space-y-6">
               <label className="space-y-2">
-                <div className="text-sm font-medium">{t.skills.importFieldUrl}</div>
                 <Input
                   value={url}
                   onChange={(event) => {

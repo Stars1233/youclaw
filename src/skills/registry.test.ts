@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
 import { loadEnv } from '../config/index.ts'
@@ -8,6 +8,10 @@ import recommendedSkillsData, {
   recommendedCategoryOrder,
   recommendedShards,
 } from './recommended/index.ts'
+import {
+  recommendationSourceEntries,
+  recommendationSourceShards,
+} from './recommendation-sources/index.ts'
 import { RegistryManager } from './registry.ts'
 import type { SkillsLoader } from './loader.ts'
 import type { Skill, SkillRegistryMeta } from './types.ts'
@@ -19,6 +23,12 @@ const apiBaseUrl = 'https://clawhub.ai/api/v1'
 const downloadUrl = `${apiBaseUrl}/download`
 const convexQueryUrl = 'https://wry-manatee-359.convex.cloud/api/query'
 const testUserSkillsDir = resolve('/tmp', `youclaw-registry-test-${process.pid}`)
+const builtinProjectSkillNames = new Set(
+  readdirSync(resolve(process.cwd(), 'skills'))
+    .filter((entry) => existsSync(resolve(process.cwd(), 'skills', entry, 'SKILL.md'))),
+)
+const filteredRecommendationSourceEntries = recommendationSourceEntries
+  .filter((entry) => !builtinProjectSkillNames.has(entry.slug))
 
 function createMockLoader(skills: Partial<Skill>[] = []) {
   let refreshCount = 0
@@ -86,7 +96,7 @@ describe('RegistryManager', () => {
       const manager = createRegistryManager(loader, async () => new Response('nope', { status: 500 }))
       const list = manager.getRecommended()
 
-      expect(list.length).toBeGreaterThanOrEqual(30)
+      expect(list).toHaveLength(filteredRecommendationSourceEntries.length)
       expect(list[0]).toMatchObject({
         slug: 'self-improving-agent',
         displayName: 'Self Improving Agent',
@@ -111,6 +121,18 @@ describe('RegistryManager', () => {
       }
     })
 
+    test('mirrors recommendation source shards by category and slug order', () => {
+      for (const category of recommendedCategoryOrder) {
+        expect(recommendedShards[category].map((entry) => entry.slug)).toEqual(
+          recommendationSourceShards[category]
+            .filter((entry) => !builtinProjectSkillNames.has(entry.slug))
+            .map((entry) => entry.slug),
+        )
+      }
+
+      expect(recommendedSkillsData).toHaveLength(filteredRecommendationSourceEntries.length)
+    })
+
     test('loads category shards in deterministic order', () => {
       const flattenedSlugs = recommendedCategoryOrder.flatMap((category) => (
         recommendedShards[category].map((entry) => {
@@ -130,7 +152,7 @@ describe('RegistryManager', () => {
       ])
       expect(flattenedSlugs).toEqual(recommendedSkillsData.map((entry) => entry.slug))
       expect(flattenedSlugs[0]).toBe('self-improving-agent')
-      expect(flattenedSlugs[flattenedSlugs.length - 1]).toBe('outlook-api')
+      expect(flattenedSlugs[flattenedSlugs.length - 1]).toBe('telegram-api')
     })
 
     test('omits installed skills from recommended results', () => {

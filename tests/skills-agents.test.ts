@@ -140,6 +140,16 @@ describe('DELETE /api/skills/:name cleanup', () => {
     }
   })
 
+  function setupSkillDir(skillName: string, suffix: string, projectMeta?: Record<string, unknown>): string {
+    const skillDir = resolve(tmpBase, suffix, skillName)
+    mkdirSync(skillDir, { recursive: true })
+    writeFileSync(resolve(skillDir, 'SKILL.md'), 'body', 'utf-8')
+    if (projectMeta) {
+      writeFileSync(resolve(skillDir, '.youclaw-skill.json'), JSON.stringify(projectMeta, null, 2), 'utf-8')
+    }
+    return resolve(skillDir, 'SKILL.md')
+  }
+
   function setupAgentDir(agentId: string, yamlContent: Record<string, unknown>): string {
     const dir = resolve(tmpBase, agentId)
     mkdirSync(dir, { recursive: true })
@@ -235,6 +245,52 @@ describe('DELETE /api/skills/:name cleanup', () => {
       const yaml = parseYaml(readFileSync(resolve(dir, 'agent.yaml'), 'utf-8'))
       expect(yaml.skills).toBeUndefined()
       expect(yaml.id).toBe('no-skills-agent')
+    } finally {
+      SkillsInstaller.prototype.uninstall = origUninstall
+    }
+  })
+
+  test('builtin skills cannot be deleted via API', async () => {
+    const skillName = 'builtin-skill'
+    const skill = createMockSkill(skillName, 'builtin')
+    skill.path = setupSkillDir(skillName, 'skills-dir3')
+
+    const { app, mockAgentManager } = buildApp([skill], [])
+
+    const { SkillsInstaller } = await import('../src/skills/installer.ts')
+    const origUninstall = SkillsInstaller.prototype.uninstall
+    const uninstallSpy = mock(async () => {})
+    SkillsInstaller.prototype.uninstall = uninstallSpy
+
+    try {
+      const res = await app.request(`/api/skills/${skillName}`, { method: 'DELETE' })
+      expect(res.status).toBe(403)
+      await expect(res.json()).resolves.toMatchObject({ error: 'Cannot uninstall builtin skills via API' })
+      expect(uninstallSpy).not.toHaveBeenCalled()
+      expect(mockAgentManager.reloadAgents).not.toHaveBeenCalled()
+    } finally {
+      SkillsInstaller.prototype.uninstall = origUninstall
+    }
+  })
+
+  test('workspace skills can be deleted via API', async () => {
+    const skillName = 'workspace-skill'
+    const skill = createMockSkill(skillName, 'workspace')
+    skill.path = setupSkillDir(skillName, 'skills-dir5')
+
+    const { app, mockAgentManager } = buildApp([skill], [])
+
+    const { SkillsInstaller } = await import('../src/skills/installer.ts')
+    const origUninstall = SkillsInstaller.prototype.uninstall
+    const uninstallSpy = mock(async () => {})
+    SkillsInstaller.prototype.uninstall = uninstallSpy
+
+    try {
+      const res = await app.request(`/api/skills/${skillName}`, { method: 'DELETE' })
+      expect(res.status).toBe(200)
+      await expect(res.json()).resolves.toMatchObject({ ok: true })
+      expect(uninstallSpy).toHaveBeenCalled()
+      expect(mockAgentManager.reloadAgents).not.toHaveBeenCalled()
     } finally {
       SkillsInstaller.prototype.uninstall = origUninstall
     }

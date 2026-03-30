@@ -1,37 +1,285 @@
 [
   {
-    "slug": "himalaya",
-    "displayName": "Himalaya",
-    "summary": "Automate email workflows with structured inbox operations.",
-    "category": "communication-collaboration",
-    "tags": ["productivity", "email", "automation"]
-  },
-  {
     "slug": "slack",
     "displayName": "Slack",
     "summary": "Send messages and manage reactions, pins, and conversations in Slack.",
     "category": "communication-collaboration",
-    "tags": ["productivity", "chat", "slack"]
+    "tags": [
+      "productivity",
+      "chat",
+      "slack"
+    ]
   },
   {
-    "slug": "google-meet",
-    "displayName": "Google Meet",
-    "summary": "Create meeting spaces, inspect conference records, and manage Google Meet participants.",
+    "slug": "himalaya",
+    "displayName": "Himalaya",
+    "summary": "Automate email workflows with structured inbox operations.",
     "category": "communication-collaboration",
-    "tags": ["productivity", "meetings", "google"]
+    "tags": [
+      "productivity",
+      "email",
+      "automation"
+    ]
   },
   {
     "slug": "gmail",
     "displayName": "Gmail",
     "summary": "Read, send, and manage Gmail threads, labels, and drafts with managed OAuth.",
     "category": "communication-collaboration",
-    "tags": ["productivity", "email", "gmail"]
+    "tags": [
+      "productivity",
+      "email",
+      "gmail"
+    ]
+  },
+  {
+    "slug": "imap-smtp-email",
+    "displayName": "imap-smtp-email",
+    "summary": "Read and send email via IMAP/SMTP.",
+    "category": "communication-collaboration",
+    "tags": [
+      "search",
+      "web",
+      "email",
+      "communication"
+    ]
+  },
+  {
+    "slug": "discord",
+    "displayName": "Discord",
+    "summary": "Use when you need to control Discord from Clawdbot via the discord tool: send messages, react, post or upload stickers, upload emojis,.",
+    "category": "communication-collaboration",
+    "tags": [
+      "search",
+      "web",
+      "chat",
+      "communication"
+    ]
   },
   {
     "slug": "outlook-api",
     "displayName": "Outlook",
     "summary": "Read, send, and manage Outlook mail, folders, calendar events, and contacts via Microsoft Graph.",
     "category": "communication-collaboration",
-    "tags": ["integrations", "microsoft", "email"]
+    "tags": [
+      "integrations",
+      "microsoft",
+      "email"
+    ]
+  },
+  {
+    "slug": "whatsapp-business",
+    "displayName": "WhatsApp Business",
+    "summary": "WhatsApp Business API integration with managed OAuth.",
+    "category": "communication-collaboration",
+    "tags": [
+      "chat",
+      "communication",
+      "messaging",
+      "collaboration"
+    ]
+  },
+  {
+    "slug": "x-twitter",
+    "displayName": "x-twitter",
+    "summary": "Interact with Twitter/X — read tweets, search, post, like, retweet, and manage your timeline.",
+    "category": "communication-collaboration",
+    "tags": [
+      "search",
+      "web",
+      "chat",
+      "communication"
+    ]
+  },
+  {
+    "slug": "google-meet",
+    "displayName": "Google Meet",
+    "summary": "Create meeting spaces, inspect conference records, and manage Google Meet participants.",
+    "category": "communication-collaboration",
+    "tags": [
+      "productivity",
+      "meetings",
+      "google"
+    ]
+  },
+  {
+    "slug": "moltbook-interact",
+    "displayName": "moltbook-interact",
+    "summary": "Interact with Moltbook social network for AI agents.",
+    "category": "communication-collaboration",
+    "tags": [
+      "marketing",
+      "communication",
+      "messaging",
+      "collaboration"
+    ]
+  },
+  {
+    "slug": "mailchimp",
+    "displayName": "Mailchimp",
+    "summary": "Mailchimp Marketing API integration with managed OAuth.",
+    "category": "communication-collaboration",
+    "tags": [
+      "email",
+      "marketing",
+      "communication",
+      "messaging"
+    ]
+  },
+  {
+    "slug": "zoho-mail",
+    "displayName": "Zoho Mail",
+    "summary": "Zoho Mail API integration with managed OAuth.",
+    "category": "communication-collaboration",
+    "tags": [
+      "email",
+      "communication",
+      "messaging",
+      "collaboration"
+    ]
+  },
+  {
+    "slug": "reddit-readonly",
+    "displayName": "Reddit (read only - no auth)",
+    "summary": "Browse and search Reddit in read-only mode using public JSON endpoints.",
+    "category": "communication-collaboration",
+    "tags": [
+      "search",
+      "web",
+      "chat",
+      "communication"
+    ]
+  },
+  {
+    "slug": "imsg",
+    "displayName": "Imsg",
+    "summary": "iMessage/SMS CLI for listing chats, history, watch, and sending.",
+    "category": "communication-collaboration",
+    "tags": [
+      "communication",
+      "messaging",
+      "collaboration",
+      "imsg"
+    ]
+  },
+  {
+    "slug": "reddit",
+    "displayName": "Reddit",
+    "summary": "Browse, search, post, and moderate Reddit.",
+    "category": "communication-collaboration",
+    "tags": [
+      "search",
+      "web",
+      "chat",
+      "communication"
+    ]
+  },
+  {
+    "slug": "feishu-messaging",
+    "displayName": "Feishu Messaging",
+    "summary": "Manage messaging and collaboration workflows with Feishu Messaging.",
+    "category": "communication-collaboration",
+    "tags": [
+      "feishu",
+      "communication",
+      "messaging",
+      "collaboration"
+    ]
+  },
+  {
+    "slug": "myfeed",
+    "displayName": "My Life Feed",
+    "summary": "Manage MyFeed things and groups via the MyFeed REST API.",
+    "category": "communication-collaboration",
+    "tags": [
+      "communication",
+      "messaging",
+      "collaboration",
+      "myfeed"
+    ]
+  },
+  {
+    "slug": "feishu-bridge",
+    "displayName": "Feishu Bridge",
+    "summary": "Connect a Feishu (Lark) bot to Clawdbot via WebSocket long-connection.",
+    "category": "communication-collaboration",
+    "tags": [
+      "feishu",
+      "chat",
+      "communication",
+      "messaging"
+    ]
+  },
+  {
+    "slug": "task-status",
+    "displayName": "Task Status",
+    "summary": "Send short status descriptions in chat for long-running tasks.",
+    "category": "communication-collaboration",
+    "tags": [
+      "chat",
+      "communication",
+      "messaging",
+      "collaboration"
+    ]
+  },
+  {
+    "slug": "feishu-doc-manager",
+    "displayName": "Feishu Doc Manager",
+    "summary": "飞书文档管理器 Seamlessly publish Markdown content to Feishu Docs with automatic formatting.",
+    "category": "communication-collaboration",
+    "tags": [
+      "documents",
+      "feishu",
+      "communication",
+      "messaging"
+    ]
+  },
+  {
+    "slug": "postiz",
+    "displayName": "postiz",
+    "summary": "postiz.",
+    "category": "communication-collaboration",
+    "tags": [
+      "communication",
+      "messaging",
+      "collaboration",
+      "postiz"
+    ]
+  },
+  {
+    "slug": "outlook",
+    "displayName": "Outlook",
+    "summary": "Read, search, and manage Outlook emails and calendar via Microsoft Graph API.",
+    "category": "communication-collaboration",
+    "tags": [
+      "search",
+      "web",
+      "email",
+      "calendar"
+    ]
+  },
+  {
+    "slug": "kit",
+    "displayName": "Kit",
+    "summary": "Kit (formerly ConvertKit) API integration with managed OAuth.",
+    "category": "communication-collaboration",
+    "tags": [
+      "email",
+      "marketing",
+      "communication",
+      "messaging"
+    ]
+  },
+  {
+    "slug": "telegram-api",
+    "displayName": "Telegram Bot",
+    "summary": "Telegram Bot API integration with managed authentication.",
+    "category": "communication-collaboration",
+    "tags": [
+      "chat",
+      "communication",
+      "messaging",
+      "collaboration"
+    ]
   }
 ]

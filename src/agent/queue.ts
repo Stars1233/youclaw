@@ -1,5 +1,6 @@
 import { getLogger } from '../logger/index.ts'
 import type { AgentManager } from './manager.ts'
+import { abortRegistry } from './abort-registry.ts'
 
 interface QueueItem {
   agentId: string
@@ -155,6 +156,7 @@ export class AgentQueue {
       'Processing queue task',
     )
 
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
     try {
       const managed = this.agentManager.getAgent(item.agentId)
       if (!managed) {
@@ -186,8 +188,8 @@ export class AgentQueue {
           browserProfileId: item.browserProfileId,
           attachments: item.attachments,
         }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => {
+        new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
             const elapsedMs = Date.now() - processStartTime
             logger.error({
               agentId: item.agentId,
@@ -197,9 +199,11 @@ export class AgentQueue {
               elapsedMs,
               category: 'queue',
             }, 'Queue item timed out — the model may be unreachable or the request is stuck')
+            // Abort the SDK subprocess so it doesn't keep running and block subsequent messages
+            abortRegistry.abort(item.chatId)
             reject(new Error('Request timed out after 5 minutes. The model may be unreachable.'))
-          }, timeoutMs),
-        ),
+          }, timeoutMs)
+        }),
       ])
 
       if (item.afterResult) {
@@ -234,6 +238,8 @@ export class AgentQueue {
       }
 
       item.reject(error)
+    } finally {
+      clearTimeout(timeoutHandle)
     }
   }
 

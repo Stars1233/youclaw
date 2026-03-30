@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { compareByNewestThenName, resolveManagedSkillCatalogInfo } from './catalog.ts'
+import { compareByNewestThenName, resolveManagedSkillCatalogInfo, resolveRuntimeSkillCatalogInfo, resolveRuntimeSkillSource } from './catalog.ts'
 
 describe('skill catalog classification', () => {
   test('classifies marketplace user projects as external user skills', () => {
@@ -58,6 +58,41 @@ describe('skill catalog classification', () => {
 
     expect(importedInfo.externalSource).toBe('local')
     expect(manualInfo.externalSource).toBe('local')
+  })
+
+  test('keeps project-scoped skills as builtin runtime source', () => {
+    const source = resolveRuntimeSkillSource('builtin', {
+      schemaVersion: 1,
+      managed: false,
+      origin: 'imported',
+      createdAt: '2026-03-18T09:00:00.000Z',
+      updatedAt: '2026-03-18T10:00:00.000Z',
+    })
+
+    expect(source).toBe('builtin')
+  })
+
+  test('classifies project-scoped runtime skills as builtin regardless of import metadata', () => {
+    const info = resolveRuntimeSkillCatalogInfo({
+      source: 'builtin',
+      registryMeta: {
+        source: 'github',
+        provider: 'github',
+        slug: 'repo-skill',
+        installedAt: '2026-03-18T10:00:00.000Z',
+        sourceUrl: 'https://github.com/example/repo',
+      },
+    }, {
+      schemaVersion: 1,
+      managed: false,
+      origin: 'imported',
+      createdAt: '2026-03-18T09:00:00.000Z',
+      updatedAt: '2026-03-18T10:00:00.000Z',
+    })
+
+    expect(info.catalogGroup).toBe('builtin')
+    expect(info.userSkillKind).toBeUndefined()
+    expect(info.externalSource).toBeUndefined()
   })
 
   test('sorts by newest timestamp and then by name', () => {

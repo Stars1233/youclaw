@@ -1,86 +1,266 @@
 [
   {
-    "slug": "notion",
-    "displayName": "Notion",
-    "summary": "Read and write Notion pages and databases for team knowledge workflows.",
-    "category": "productivity",
-    "tags": ["memory", "notes", "notion"]
-  },
-  {
-    "slug": "obsidian",
-    "displayName": "Obsidian",
-    "summary": "Operate Obsidian vaults for markdown-first personal knowledge management.",
-    "category": "productivity",
-    "tags": ["memory", "notes", "obsidian"]
-  },
-  {
-    "slug": "apple-notes",
-    "displayName": "Apple Notes",
-    "summary": "Access and organize Apple Notes as a lightweight memory backend.",
-    "category": "productivity",
-    "tags": ["memory", "notes", "apple"]
-  },
-  {
-    "slug": "nano-pdf",
-    "displayName": "Nano PDF",
-    "summary": "Inspect, annotate, and rewrite PDF content through natural language.",
-    "category": "productivity",
-    "tags": ["documents", "pdf", "editing"]
-  },
-  {
-    "slug": "word-docx",
-    "displayName": "Word / DOCX",
-    "summary": "Create, inspect, and edit Word and DOCX documents with reliable formatting and compatibility checks.",
-    "category": "productivity",
-    "tags": ["documents", "word", "docx"]
-  },
-  {
-    "slug": "youtube-watcher",
-    "displayName": "YouTube Watcher",
-    "summary": "Fetch and read YouTube transcripts for review, summarization, and extraction workflows.",
-    "category": "productivity",
-    "tags": ["media", "youtube", "transcripts"]
-  },
-  {
-    "slug": "trello",
-    "displayName": "Trello",
-    "summary": "Manage Trello boards, lists, and cards for lightweight project coordination.",
-    "category": "productivity",
-    "tags": ["productivity", "project-management", "trello"]
-  },
-  {
-    "slug": "automation-workflows",
-    "displayName": "Automation Workflows",
-    "summary": "Design and maintain cross-tool automations that reduce repetitive manual work.",
-    "category": "productivity",
-    "tags": ["productivity", "automation", "workflows"]
-  },
-  {
     "slug": "weather",
     "displayName": "Weather",
     "summary": "Fetch current and forecast weather for location-based workflows.",
     "category": "productivity",
-    "tags": ["data", "weather", "forecast"]
+    "tags": [
+      "data",
+      "weather",
+      "forecast"
+    ]
   },
   {
     "slug": "multi-search-engine",
     "displayName": "Multi Search Engine",
     "summary": "Query multiple global and China-friendly search engines with advanced search operators.",
     "category": "productivity",
-    "tags": ["data", "search", "research"]
+    "tags": [
+      "data",
+      "search",
+      "research"
+    ]
   },
   {
-    "slug": "brave-search",
-    "displayName": "Brave Search",
-    "summary": "Search the web and extract content through the Brave Search API.",
+    "slug": "nano-pdf",
+    "displayName": "Nano PDF",
+    "summary": "Inspect, annotate, and rewrite PDF content through natural language.",
     "category": "productivity",
-    "tags": ["data", "search", "web"]
+    "tags": [
+      "documents",
+      "pdf",
+      "editing"
+    ]
+  },
+  {
+    "slug": "notion",
+    "displayName": "Notion",
+    "summary": "Read and write Notion pages and databases for team knowledge workflows.",
+    "category": "productivity",
+    "tags": [
+      "memory",
+      "notes",
+      "notion"
+    ]
+  },
+  {
+    "slug": "sonoscli",
+    "displayName": "Sonoscli",
+    "summary": "Control Sonos speakers (discover/status/play/volume/group).",
+    "category": "productivity",
+    "tags": [
+      "productivity",
+      "automation",
+      "workflows",
+      "sonoscli"
+    ]
+  },
+  {
+    "slug": "obsidian",
+    "displayName": "Obsidian",
+    "summary": "Operate Obsidian vaults for markdown-first personal knowledge management.",
+    "category": "productivity",
+    "tags": [
+      "memory",
+      "notes",
+      "obsidian"
+    ]
   },
   {
     "slug": "baidu-search",
     "displayName": "Baidu Web Search",
     "summary": "Use Baidu AI Search for live web lookup, docs, and research topics.",
     "category": "productivity",
-    "tags": ["data", "search", "china"]
+    "tags": [
+      "data",
+      "search",
+      "china"
+    ]
+  },
+  {
+    "slug": "automation-workflows",
+    "displayName": "Automation Workflows",
+    "summary": "Design and maintain cross-tool automations that reduce repetitive manual work.",
+    "category": "productivity",
+    "tags": [
+      "productivity",
+      "automation",
+      "workflows"
+    ]
+  },
+  {
+    "slug": "brave-search",
+    "displayName": "Brave Search",
+    "summary": "Search the web and extract content through the Brave Search API.",
+    "category": "productivity",
+    "tags": [
+      "data",
+      "search",
+      "web"
+    ]
+  },
+  {
+    "slug": "openclaw-tavily-search",
+    "displayName": "Tavily 搜索",
+    "summary": "Web search via Tavily API (alternative to Brave).",
+    "category": "productivity",
+    "tags": [
+      "search",
+      "web",
+      "productivity",
+      "automation"
+    ]
+  },
+  {
+    "slug": "youtube-watcher",
+    "displayName": "YouTube Watcher",
+    "summary": "Fetch and read YouTube transcripts for review, summarization, and extraction workflows.",
+    "category": "productivity",
+    "tags": [
+      "media",
+      "youtube",
+      "transcripts"
+    ]
+  },
+  {
+    "slug": "desktop-control",
+    "displayName": "Desktop Control",
+    "summary": "Advanced desktop automation with mouse, keyboard, and screen control.",
+    "category": "productivity",
+    "tags": [
+      "productivity",
+      "automation",
+      "workflows",
+      "desktop"
+    ]
+  },
+  {
+    "slug": "outlook-graph",
+    "displayName": "Outlook Graph",
+    "summary": "Connect OpenClaw to Outlook and Microsoft Graph for email, calendar, contacts, and folder operations using a pre-provided access token.",
+    "category": "productivity",
+    "tags": [
+      "email",
+      "calendar",
+      "productivity",
+      "automation"
+    ]
+  },
+  {
+    "slug": "trello",
+    "displayName": "Trello",
+    "summary": "Manage Trello boards, lists, and cards for lightweight project coordination.",
+    "category": "productivity",
+    "tags": [
+      "productivity",
+      "project-management",
+      "trello"
+    ]
+  },
+  {
+    "slug": "news-summary",
+    "displayName": "News Summary",
+    "summary": "This skill should be used when the user asks for news updates, daily briefings, or what's happening in the world.",
+    "category": "productivity",
+    "tags": [
+      "audio",
+      "productivity",
+      "automation",
+      "workflows"
+    ]
+  },
+  {
+    "slug": "caldav-calendar",
+    "displayName": "Caldav Calendar",
+    "summary": "Sync and query CalDAV calendars (iCloud, Google, Fastmail, Nextcloud, etc.) using vdirsyncer + khal.",
+    "category": "productivity",
+    "tags": [
+      "calendar",
+      "productivity",
+      "automation",
+      "workflows"
+    ]
+  },
+  {
+    "slug": "apple-notes",
+    "displayName": "Apple Notes",
+    "summary": "Access and organize Apple Notes as a lightweight memory backend.",
+    "category": "productivity",
+    "tags": [
+      "memory",
+      "notes",
+      "apple"
+    ]
+  },
+  {
+    "slug": "word-docx",
+    "displayName": "Word / DOCX",
+    "summary": "Create, inspect, and edit Word and DOCX documents with reliable formatting and compatibility checks.",
+    "category": "productivity",
+    "tags": [
+      "documents",
+      "word",
+      "docx"
+    ]
+  },
+  {
+    "slug": "pdf",
+    "displayName": "Pdf",
+    "summary": "Comprehensive PDF manipulation toolkit for extracting text and tables, creating new PDFs, merging/splitting documents, and handling forms.",
+    "category": "productivity",
+    "tags": [
+      "documents",
+      "productivity",
+      "automation",
+      "workflows"
+    ]
+  },
+  {
+    "slug": "web-search-exa",
+    "displayName": "Web Search by Exa",
+    "summary": "Neural web search, content extraction, company and people research, code search, and deep research via the Exa MCP server.",
+    "category": "productivity",
+    "tags": [
+      "search",
+      "web",
+      "mcp",
+      "productivity"
+    ]
+  },
+  {
+    "slug": "lnbits-with-qrcode",
+    "displayName": "LNBits Wallet wtih QR Code",
+    "summary": "Manage LNbits Lightning Wallet (Balance, Pay, Invoice).",
+    "category": "productivity",
+    "tags": [
+      "productivity",
+      "automation",
+      "workflows",
+      "lnbits"
+    ]
+  },
+  {
+    "slug": "duckduckgo-search",
+    "displayName": "Duckduckgo Search",
+    "summary": "Performs web searches using DuckDuckGo to retrieve real-time information from the internet.",
+    "category": "productivity",
+    "tags": [
+      "search",
+      "web",
+      "productivity",
+      "automation"
+    ]
+  },
+  {
+    "slug": "apple-reminders",
+    "displayName": "Apple Reminders",
+    "summary": "Manage Apple Reminders via the `remindctl` CLI on macOS (list, add, edit, complete, delete).",
+    "category": "productivity",
+    "tags": [
+      "productivity",
+      "automation",
+      "workflows",
+      "apple"
+    ]
   }
 ]

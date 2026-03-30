@@ -20,6 +20,19 @@ import { CalendarDays, Download, Loader2, Package, Puzzle, RefreshCw, Star, Tras
 
 type MarketplaceCardViewMode = 'list' | 'grid'
 
+function normalizeMarketplaceActionError(message: string, fallback: string, skillNotFoundLabel: string) {
+  if (!message) {
+    return fallback
+  }
+
+  const skillNotFoundMatch = message.match(/^Skill "(.+)" was not found$/)
+  if (skillNotFoundMatch) {
+    return skillNotFoundLabel.replace('{name}', skillNotFoundMatch[1] ?? '')
+  }
+
+  return message
+}
+
 function formatMetricValue(metric: MarketplaceCardMetricViewModel, locale: 'zh' | 'en') {
   if (metric.kind === 'number' && typeof metric.value === 'number') {
     return new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
@@ -73,7 +86,7 @@ function MarketplaceMetricSection({
   return (
     <div
       className={cn(
-        viewMode === 'grid' ? 'mt-3 flex flex-wrap gap-2' : 'mt-2 flex flex-wrap gap-2',
+        viewMode === 'grid' ? 'mt-3 flex flex-wrap items-center gap-x-4 gap-y-2' : 'mt-2 flex flex-wrap items-center gap-x-4 gap-y-2',
         className,
       )}
     >
@@ -84,12 +97,10 @@ function MarketplaceMetricSection({
         return (
           <div
             key={metric.key}
-            className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-border/50 bg-muted/20 px-2.5 py-1.5 text-xs text-foreground/85 shadow-none"
-            title={`${metric.label}: ${value}`}
-            aria-label={`${metric.label}: ${value}`}
+            className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
           >
             <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate font-medium leading-none" data-testid={metric.testId}>
+            <span className="truncate leading-none" data-testid={metric.testId}>
               {value}
             </span>
           </div>
@@ -97,19 +108,6 @@ function MarketplaceMetricSection({
       })}
     </div>
   )
-}
-
-function normalizeMarketplaceActionError(message: string, fallback: string, skillNotFoundLabel: string) {
-  if (!message) {
-    return fallback
-  }
-
-  const skillNotFoundMatch = message.match(/^Skill "(.+)" was not found$/)
-  if (skillNotFoundMatch) {
-    return skillNotFoundLabel.replace('{name}', skillNotFoundMatch[1] ?? '')
-  }
-
-  return message
 }
 
 export function MarketplaceCard({
@@ -146,10 +144,16 @@ export function MarketplaceCard({
     ),
     [locale, registrySource, registrySources],
   )
-  const buildMarketplaceMessage = (template: string) => template.replace('{name}', viewModel.displayName)
-  const formatActionError = (message: string | undefined, fallback: string) => (
-    normalizeMarketplaceActionError(message ?? '', fallback, t.skills.marketplaceSkillNotFound)
-  )
+  const buildMarketplaceMessage = useMemo(() => (
+    (template: string, skillLabel: string) => template.replace('{name}', skillLabel)
+  ), [])
+  const formatActionError = useMemo(() => (
+    (message: string | undefined, fallback: string) => normalizeMarketplaceActionError(
+      message ?? '',
+      fallback,
+      t.skills.marketplaceSkillNotFound,
+    )
+  ), [t.skills.marketplaceSkillNotFound])
 
   const handleInstall = async () => {
     setStatus('installing')
@@ -157,17 +161,15 @@ export function MarketplaceCard({
       const result = await installRecommendedSkill({ slug: viewModel.slug, source: actionSource })
       if (result.ok) {
         setStatus('idle')
-        notify.success(buildMarketplaceMessage(t.skills.marketplaceInstallSuccess))
         onChanged({ type: 'install', slug: viewModel.slug, source: actionSource })
+        notify.success(buildMarketplaceMessage(t.skills.marketplaceInstallSuccess, viewModel.displayName))
       } else {
-        const message = formatActionError(result.error, t.skills.installFailed)
         setStatus('idle')
-        notify.error(message)
+        notify.error(formatActionError(result.error, t.skills.installFailed))
       }
     } catch (error) {
-      const message = formatActionError(error instanceof Error ? error.message : undefined, t.skills.installFailed)
       setStatus('idle')
-      notify.error(message)
+      notify.error(formatActionError(error instanceof Error ? error.message : undefined, t.skills.installFailed))
     }
   }
 
@@ -177,17 +179,15 @@ export function MarketplaceCard({
       const result = await updateMarketplaceSkill({ slug: viewModel.slug, source: actionSource })
       if (result.ok) {
         setStatus('idle')
-        notify.success(buildMarketplaceMessage(t.skills.marketplaceUpdateSuccess))
         onChanged({ type: 'update', slug: viewModel.slug, source: actionSource })
+        notify.success(buildMarketplaceMessage(t.skills.marketplaceUpdateSuccess, viewModel.displayName))
       } else {
-        const message = formatActionError(result.error, t.skills.updateFailed)
         setStatus('idle')
-        notify.error(message)
+        notify.error(formatActionError(result.error, t.skills.updateFailed))
       }
     } catch (error) {
-      const message = formatActionError(error instanceof Error ? error.message : undefined, t.skills.updateFailed)
       setStatus('idle')
-      notify.error(message)
+      notify.error(formatActionError(error instanceof Error ? error.message : undefined, t.skills.updateFailed))
     }
   }
 
@@ -209,17 +209,15 @@ export function MarketplaceCard({
       const result = await uninstallRecommendedSkill({ slug: viewModel.slug, source: actionSource })
       if (result.ok) {
         setStatus('idle')
-        notify.success(buildMarketplaceMessage(t.skills.marketplaceUninstallSuccess))
         onChanged({ type: 'uninstall', slug: viewModel.slug, source: actionSource })
+        notify.success(buildMarketplaceMessage(t.skills.marketplaceUninstallSuccess, viewModel.displayName))
       } else {
-        const message = formatActionError(result.error, t.skills.uninstallFailed)
         setStatus('idle')
-        notify.error(message)
+        notify.error(formatActionError(result.error, t.skills.uninstallFailed))
       }
     } catch (error) {
-      const message = formatActionError(error instanceof Error ? error.message : undefined, t.skills.uninstallFailed)
       setStatus('idle')
-      notify.error(message)
+      notify.error(formatActionError(error instanceof Error ? error.message : undefined, t.skills.uninstallFailed))
     }
   }
 

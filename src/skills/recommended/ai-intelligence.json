@@ -4,62 +4,278 @@
     "displayName": "Self Improving Agent",
     "summary": "Capture failures and corrections to improve future task execution quality.",
     "category": "ai-intelligence",
-    "tags": ["agent", "self-improvement", "reflection"]
-  },
-  {
-    "slug": "proactive-agent",
-    "displayName": "Proactive Agent",
-    "summary": "Turn reactive task execution into proactive planning, follow-through, and continuous improvement.",
-    "category": "ai-intelligence",
-    "tags": ["agent", "automation", "proactive"]
-  },
-  {
-    "slug": "self-improving",
-    "displayName": "Self-Improving + Proactive Agent",
-    "summary": "Combine self-reflection, long-term learning, and proactive behavior in a single agent workflow.",
-    "category": "ai-intelligence",
-    "tags": ["agent", "learning", "memory"]
+    "tags": [
+      "agent",
+      "self-improvement",
+      "reflection"
+    ]
   },
   {
     "slug": "ontology",
     "displayName": "Ontology",
     "summary": "Build and query structured knowledge graphs for reusable task memory.",
     "category": "ai-intelligence",
-    "tags": ["memory", "knowledge-graph", "reasoning"]
+    "tags": [
+      "memory",
+      "knowledge-graph",
+      "reasoning"
+    ]
   },
   {
-    "slug": "byterover",
-    "displayName": "ByteRover",
-    "summary": "Store and retrieve project patterns, decisions, and context for knowledge-rich agent workflows.",
+    "slug": "proactive-agent",
+    "displayName": "Proactive Agent",
+    "summary": "Turn reactive task execution into proactive planning, follow-through, and continuous improvement.",
     "category": "ai-intelligence",
-    "tags": ["memory", "knowledge-base", "retrieval"]
+    "tags": [
+      "agent",
+      "automation",
+      "proactive"
+    ]
   },
   {
-    "slug": "memory-setup",
-    "displayName": "Memory Setup",
-    "summary": "Set up persistent memory search and fix weak recall in existing agents.",
+    "slug": "self-improving",
+    "displayName": "Self-Improving + Proactive Agent",
+    "summary": "Combine self-reflection, long-term learning, and proactive behavior in a single agent workflow.",
     "category": "ai-intelligence",
-    "tags": ["memory", "setup", "configuration"]
+    "tags": [
+      "agent",
+      "learning",
+      "memory"
+    ]
   },
   {
     "slug": "nano-banana-pro",
     "displayName": "Nano Banana Pro",
     "summary": "Generate and edit images for creative and product content workflows.",
     "category": "ai-intelligence",
-    "tags": ["media", "image-generation", "editing"]
+    "tags": [
+      "media",
+      "image-generation",
+      "editing"
+    ]
   },
   {
     "slug": "openai-whisper",
     "displayName": "OpenAI Whisper",
     "summary": "Transcribe audio and normalize transcripts for downstream automation.",
     "category": "ai-intelligence",
-    "tags": ["media", "audio", "transcription"]
+    "tags": [
+      "media",
+      "audio",
+      "transcription"
+    ]
+  },
+  {
+    "slug": "free-ride",
+    "displayName": "Free Ride - Unlimited free AI",
+    "summary": "Manages free AI models from OpenRouter for OpenClaw.",
+    "category": "ai-intelligence",
+    "tags": [
+      "agent",
+      "automation",
+      "assistant",
+      "free"
+    ]
+  },
+  {
+    "slug": "byterover",
+    "displayName": "ByteRover",
+    "summary": "Store and retrieve project patterns, decisions, and context for knowledge-rich agent workflows.",
+    "category": "ai-intelligence",
+    "tags": [
+      "memory",
+      "knowledge-base",
+      "retrieval"
+    ]
+  },
+  {
+    "slug": "evolver",
+    "displayName": "Evolver",
+    "summary": "A self-evolution engine for AI agents.",
+    "category": "ai-intelligence",
+    "tags": [
+      "agent",
+      "automation",
+      "assistant",
+      "evolver"
+    ]
+  },
+  {
+    "slug": "gemini",
+    "displayName": "Gemini",
+    "summary": "Gemini CLI for one-shot Q&A, summaries, and generation.",
+    "category": "ai-intelligence",
+    "tags": [
+      "agent",
+      "automation",
+      "assistant",
+      "gemini"
+    ]
   },
   {
     "slug": "tavily",
     "displayName": "Tavily AI Search",
     "summary": "Run AI-optimized web research with structured results and source-friendly summaries.",
     "category": "ai-intelligence",
-    "tags": ["data", "research", "retrieval"]
+    "tags": [
+      "data",
+      "research",
+      "retrieval"
+    ]
+  },
+  {
+    "slug": "memory-setup",
+    "displayName": "Memory Setup",
+    "summary": "Set up persistent memory search and fix weak recall in existing agents.",
+    "category": "ai-intelligence",
+    "tags": [
+      "memory",
+      "setup",
+      "configuration"
+    ]
+  },
+  {
+    "slug": "capability-evolver",
+    "displayName": "Capability Evolver",
+    "summary": "A self-evolution engine for AI agents.",
+    "category": "ai-intelligence",
+    "tags": [
+      "agent",
+      "automation",
+      "assistant",
+      "capability"
+    ]
+  },
+  {
+    "slug": "feishu-evolver-wrapper",
+    "displayName": "Feishu Evolver Wrapper",
+    "summary": "Feishu-integrated wrapper for the capability-evolver.",
+    "category": "ai-intelligence",
+    "tags": [
+      "feishu",
+      "agent",
+      "automation",
+      "assistant"
+    ]
+  },
+  {
+    "slug": "agent-memory",
+    "displayName": "Agent Memory",
+    "summary": "Persistent memory for AI agents to store facts, learn from actions, recall information, and track entities across sessions.",
+    "category": "ai-intelligence",
+    "tags": [
+      "memory",
+      "agent",
+      "automation",
+      "assistant"
+    ]
+  },
+  {
+    "slug": "deep-research-pro",
+    "displayName": "Deep Research Pro",
+    "summary": "Multi-source deep research agent.",
+    "category": "ai-intelligence",
+    "tags": [
+      "agent",
+      "automation",
+      "assistant",
+      "deep"
+    ]
+  },
+  {
+    "slug": "markdown-convert",
+    "displayName": "Markdown.new Skill",
+    "summary": "Convert public web pages into clean Markdown with markdown.new for AI workflows.",
+    "category": "ai-intelligence",
+    "tags": [
+      "documents",
+      "agent",
+      "automation",
+      "assistant"
+    ]
+  },
+  {
+    "slug": "sag",
+    "displayName": "Sag",
+    "summary": "ElevenLabs text-to-speech with mac-style say UX.",
+    "category": "ai-intelligence",
+    "tags": [
+      "audio",
+      "agent",
+      "automation",
+      "assistant"
+    ]
+  },
+  {
+    "slug": "openai-image-gen",
+    "displayName": "Openai Image Gen",
+    "summary": "Batch-generate images via OpenAI Images API.",
+    "category": "ai-intelligence",
+    "tags": [
+      "image",
+      "agent",
+      "automation",
+      "assistant"
+    ]
+  },
+  {
+    "slug": "agent-autonomy-kit",
+    "displayName": "Agent Autonomy Kit",
+    "summary": "Stop waiting for prompts.",
+    "category": "ai-intelligence",
+    "tags": [
+      "agent",
+      "automation",
+      "assistant",
+      "autonomy"
+    ]
+  },
+  {
+    "slug": "memory-manager",
+    "displayName": "Memory Manager",
+    "summary": "Local memory management for agents.",
+    "category": "ai-intelligence",
+    "tags": [
+      "search",
+      "web",
+      "memory",
+      "agent"
+    ]
+  },
+  {
+    "slug": "memory-hygiene",
+    "displayName": "Memory Hygiene",
+    "summary": "Audit, clean, and optimize Clawdbot's vector memory (LanceDB).",
+    "category": "ai-intelligence",
+    "tags": [
+      "memory",
+      "security",
+      "agent",
+      "automation"
+    ]
+  },
+  {
+    "slug": "openai-whisper-api",
+    "displayName": "Openai Whisper Api",
+    "summary": "Transcribe audio via OpenAI Audio Transcriptions API (Whisper).",
+    "category": "ai-intelligence",
+    "tags": [
+      "audio",
+      "agent",
+      "automation",
+      "assistant"
+    ]
+  },
+  {
+    "slug": "using-superpowers",
+    "displayName": "Using Superpowers",
+    "summary": "Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response.",
+    "category": "ai-intelligence",
+    "tags": [
+      "agent",
+      "automation",
+      "assistant",
+      "using"
+    ]
   }
 ]

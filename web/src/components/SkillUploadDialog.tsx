@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isTauri } from '@/api/transport'
-import { installSkillFromArchive, installSkillFromPath } from '@/api/client'
-import { Button } from '@/components/ui/button'
+import { installSkillFromArchive } from '@/api/client'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -13,7 +10,7 @@ import { useI18n } from '@/i18n'
 import { extractDuplicateSkillName } from '@/lib/skill-import'
 import { cn } from '@/lib/utils'
 import { notify } from '@/stores/app'
-import { FileArchive, FolderOpen, Loader2, Upload, X } from 'lucide-react'
+import { Loader2, Upload, X } from 'lucide-react'
 
 function isZipFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.zip') || file.type === 'application/zip'
@@ -30,7 +27,7 @@ export function SkillUploadDialog({
 }) {
   const { t } = useI18n()
   const zipInputRef = useRef<HTMLInputElement | null>(null)
-  const [actionStatus, setActionStatus] = useState<'idle' | 'folder' | 'archive'>('idle')
+  const [actionStatus, setActionStatus] = useState<'idle' | 'archive'>('idle')
   const [actionError, setActionError] = useState('')
   const [selectionLabel, setSelectionLabel] = useState('')
   const [isDragActive, setIsDragActive] = useState(false)
@@ -44,7 +41,7 @@ export function SkillUploadDialog({
     }
   }, [open])
 
-  const runUpload = useCallback(async (kind: 'folder' | 'archive', label: string, runner: () => Promise<void>) => {
+  const runUpload = useCallback(async (kind: 'archive', label: string, runner: () => Promise<void>) => {
     setActionStatus(kind)
     setActionError('')
     setSelectionLabel(label)
@@ -52,8 +49,8 @@ export function SkillUploadDialog({
     try {
       await runner()
       await onUploaded()
-      onOpenChange(false)
       notify.success(t.skills.uploadSuccess)
+      onOpenChange(false)
     } catch (error) {
       const message = getUploadErrorMessage(error, t)
       setActionError(message)
@@ -63,31 +60,6 @@ export function SkillUploadDialog({
     }
   }, [onOpenChange, onUploaded, t])
 
-  const handleDirectoryPick = useCallback(async () => {
-    if (!isTauri || actionStatus !== 'idle') {
-      return
-    }
-
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const result = await open({
-      directory: true,
-      multiple: false,
-    })
-
-    if (!result || Array.isArray(result)) {
-      return
-    }
-
-    const selectedPath = result.trim()
-    if (!selectedPath) {
-      return
-    }
-
-    await runUpload('folder', selectedPath, async () => {
-      await installSkillFromPath({ sourcePath: selectedPath })
-    })
-  }, [actionStatus, runUpload])
-
   const handleArchiveFile = useCallback(async (file: File | null | undefined) => {
     if (!file || actionStatus !== 'idle') {
       return
@@ -95,7 +67,6 @@ export function SkillUploadDialog({
 
     if (!isZipFile(file)) {
       setActionError(t.skills.uploadInvalidArchive)
-      notify.error(t.skills.uploadInvalidArchive)
       return
     }
 
@@ -109,12 +80,11 @@ export function SkillUploadDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[min(92vw,760px)] max-w-3xl overflow-hidden rounded-[28px] border border-border/70 bg-background p-0 shadow-2xl">
-          <DialogHeader className="border-b border-border/70 px-8 py-7 text-left">
+          <DialogHeader className="px-8 py-7 text-left">
             <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <div className="space-y-1">
                 <DialogTitle className="text-[1.75rem] leading-tight tracking-tight">{t.skills.uploadSkillTitle}</DialogTitle>
-                <DialogDescription>{t.skills.uploadSkillDescription}</DialogDescription>
               </div>
             </div>
             <button
@@ -186,47 +156,8 @@ export function SkillUploadDialog({
               <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-background shadow-sm">
                 {busy ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <Upload className="h-8 w-8 text-muted-foreground" />}
               </div>
-              <div className="text-[1.85rem] font-semibold tracking-tight">{t.skills.uploadDropTitle}</div>
-              <div className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-                {t.skills.uploadDropHint}
-              </div>
-              <div
-                className="mt-5 flex flex-wrap items-center justify-center gap-3"
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 rounded-2xl px-5"
-                  disabled={busy}
-                  onClick={() => {
-                    zipInputRef.current?.click()
-                  }}
-                >
-                  <FileArchive className="h-4 w-4" />
-                  {t.skills.uploadChooseZip}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 rounded-2xl px-5"
-                  disabled={busy || !isTauri}
-                  onClick={() => {
-                    void handleDirectoryPick()
-                  }}
-                >
-                  <FolderOpen className="h-4 w-4" />
-                  {t.skills.uploadChooseFolder}
-                </Button>
-              </div>
+              <div className="text-[1.35rem] font-normal tracking-tight text-muted-foreground">{t.skills.uploadDropTitle}</div>
             </div>
-
-            {!isTauri && (
-              <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                {t.skills.uploadFolderDesktopOnly}
-              </div>
-            )}
 
             {selectionLabel && (
               <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-sm">
@@ -236,7 +167,7 @@ export function SkillUploadDialog({
             )}
 
             <div className="rounded-[24px] bg-background">
-              <div className="text-[1.9rem] font-semibold tracking-tight">{t.skills.uploadRequirementsTitle}</div>
+              <div className="text-[1.35rem] font-normal tracking-tight">{t.skills.uploadRequirementsTitle}</div>
               <ul className="mt-4 list-disc space-y-3 pl-6 text-lg leading-8 text-muted-foreground">
                 <li>{t.skills.uploadRequirementContainsSkill}</li>
                 <li>{t.skills.uploadRequirementFrontmatter}</li>
