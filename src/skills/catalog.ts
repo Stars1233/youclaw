@@ -4,6 +4,8 @@ import type {
   SkillInstallSource,
   SkillProject,
   SkillProjectMeta,
+  SkillRegistryMeta,
+  SkillRuntimeSource,
 } from './types.ts'
 
 const MARKETPLACE_INSTALL_SOURCES = new Set<SkillInstallSource>(['clawhub', 'tencent'])
@@ -30,6 +32,34 @@ export function resolveExternalSkillSource(
     return 'local'
   }
   return undefined
+}
+
+export function resolveRuntimeSkillSource(
+  source: SkillRuntimeSource,
+  _projectMeta?: SkillProjectMeta | null,
+): SkillRuntimeSource {
+  return source
+}
+
+export function resolveRuntimeSkillCatalogInfo(
+  skill: Pick<SkillProject, 'source'> & { registryMeta?: SkillRegistryMeta },
+  projectMeta?: SkillProjectMeta | null,
+): SkillCatalogInfo {
+  const runtimeSource = resolveRuntimeSkillSource(skill.source, projectMeta)
+
+  if (runtimeSource === 'user') {
+    return {
+      catalogGroup: 'user',
+      userSkillKind: projectMeta?.managed ? 'custom' : 'external',
+      externalSource: projectMeta?.managed ? undefined : resolveExternalSkillSource(skill.registryMeta, projectMeta),
+      sortTimestamp: skill.registryMeta?.installedAt ?? projectMeta?.updatedAt ?? projectMeta?.createdAt,
+    }
+  }
+
+  return {
+    catalogGroup: 'builtin',
+    sortTimestamp: undefined,
+  }
 }
 
 export function resolveManagedSkillCatalogInfo(skill: Pick<

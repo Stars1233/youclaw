@@ -210,6 +210,50 @@ describe('SkillProjectService', () => {
     expect(detail.project.name).toBe('alpha-omega-ü-01')
     expect(existsSync(resolve(fixture.skillsDir, 'alpha-omega-ü-01', '.youclaw-skill.json'))).toBe(true)
   })
+
+  test('keeps imported origin for readonly project skills loaded outside the managed user directory', () => {
+    const fixture = createFixture()
+    const importedRoot = resolve(fixture.root, 'project-imports', 'gradio')
+    mkdirSync(importedRoot, { recursive: true })
+    writeFileSync(resolve(importedRoot, 'SKILL.md'), '---\nname: gradio\ndescription: Imported skill\n---\nbody\n')
+    writeFileSync(resolve(importedRoot, '.youclaw-skill.json'), JSON.stringify({
+      schemaVersion: 1,
+      managed: false,
+      origin: 'imported',
+      createdAt: '2026-03-30T00:00:00.000Z',
+      updatedAt: '2026-03-30T00:00:00.000Z',
+    }, null, 2), 'utf-8')
+    fixture.loader.skills = [{
+      name: 'gradio',
+      source: 'user',
+      frontmatter: { name: 'gradio', description: 'Imported skill' },
+      content: 'body',
+      path: resolve(importedRoot, 'SKILL.md'),
+      eligible: true,
+      eligibilityErrors: [],
+      eligibilityDetail: {
+        os: { passed: true, current: process.platform },
+        dependencies: { passed: true, results: [] },
+        env: { passed: true, results: [] },
+      },
+      loadedAt: Date.now(),
+      enabled: true,
+      usable: true,
+      registryMeta: {
+        source: 'raw-url',
+        provider: 'raw-url',
+        slug: 'gradio',
+        installedAt: '2026-03-30T00:00:00.000Z',
+        sourceUrl: 'https://example.com/gradio.md',
+      },
+    }]
+
+    const detail = fixture.service.getProject('gradio')
+
+    expect(detail.project.source).toBe('user')
+    expect(detail.project.editable).toBe(false)
+    expect(detail.project.origin).toBe('imported')
+  })
 })
 
 function createFixture(options?: {

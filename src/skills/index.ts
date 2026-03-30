@@ -7,7 +7,13 @@ export { bumpSkillsSnapshotVersion, getSkillsSnapshotVersion, resetSkillsSnapsho
 export { scanWorkspaceFiles, matchSkillGlobs } from './globs.ts'
 export { parseSkillInvocations } from './invoke.ts'
 export { SkillProjectService, normalizeSkillName, parseSkillMarkdown, stringifySkillMarkdown } from './project-service.ts'
-export { compareByNewestThenName, resolveExternalSkillSource, resolveManagedSkillCatalogInfo } from './catalog.ts'
+export {
+  compareByNewestThenName,
+  resolveExternalSkillSource,
+  resolveManagedSkillCatalogInfo,
+  resolveRuntimeSkillCatalogInfo,
+  resolveRuntimeSkillSource,
+} from './catalog.ts'
 export type { ParsedMessage } from './invoke.ts'
 export type {
   Skill,

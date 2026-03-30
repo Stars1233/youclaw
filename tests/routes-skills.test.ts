@@ -1,6 +1,6 @@
-import { afterEach, describe, test, expect } from 'bun:test'
+import { afterEach, describe, test, expect, mock } from 'bun:test'
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { basename, resolve } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
 import { stringify as stringifyYaml } from 'yaml'
@@ -298,6 +298,35 @@ describe('skills routes', () => {
     })
   })
 
+  test('POST /skills/install-from-path defaults to the user skills directory', async () => {
+    let capturedTargetDir = ''
+    const installer = {
+      installFromLocal: async (_sourcePath: string, targetDir: string) => {
+        capturedTargetDir = targetDir
+      },
+    }
+    const app = createSkillsRoutes(
+      {
+        loadAllSkills: () => [baseSkill],
+        getCacheStats: () => ({}),
+        getConfig: () => ({}),
+        refresh: () => [baseSkill],
+        loadSkillsForAgent: () => [baseSkill],
+      } as any,
+      { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
+      { installer: installer as any },
+    )
+
+    const res = await app.request('/skills/install-from-path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourcePath: '/tmp/example-skill' }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(capturedTargetDir).toBe(resolve(homedir(), '.youclaw', 'skills'))
+  })
+
   test('POST /skills/install-from-url with invalid body returns 400', async () => {
     const app = createSkillsRoutes(
       {
@@ -317,6 +346,35 @@ describe('skills routes', () => {
     })
 
     expect(res.status).toBe(400)
+  })
+
+  test('POST /skills/install-from-url defaults to the user skills directory', async () => {
+    let capturedTargetDir = ''
+    const installer = {
+      installFromUrl: async (_url: string, targetDir: string) => {
+        capturedTargetDir = targetDir
+      },
+    }
+    const app = createSkillsRoutes(
+      {
+        loadAllSkills: () => [baseSkill],
+        getCacheStats: () => ({}),
+        getConfig: () => ({}),
+        refresh: () => [baseSkill],
+        loadSkillsForAgent: () => [baseSkill],
+      } as any,
+      { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
+      { installer: installer as any },
+    )
+
+    const res = await app.request('/skills/install-from-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://example.com/SKILL.md' }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(capturedTargetDir).toBe(resolve(homedir(), '.youclaw', 'skills'))
   })
 
   test('POST /skills/install-from-archive installs uploaded zip and refreshes the loader', async () => {
@@ -376,6 +434,40 @@ describe('skills routes', () => {
       originalFilename: 'archive-skill.zip',
       slug: 'archive-skill',
     })
+  })
+
+  test('POST /skills/install-from-archive defaults to the user skills directory', async () => {
+    let capturedTargetDir = ''
+    const installer = {
+      installFromLocal: async (_sourcePath: string, targetDir: string) => {
+        capturedTargetDir = targetDir
+      },
+    }
+    const app = createSkillsRoutes(
+      {
+        loadAllSkills: () => [baseSkill],
+        getCacheStats: () => ({}),
+        getConfig: () => ({}),
+        refresh: () => [baseSkill],
+        loadSkillsForAgent: () => [baseSkill],
+      } as any,
+      { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
+      { installer: installer as any },
+    )
+
+    const archive = zipSync({
+      'bundle/SKILL.md': strToU8('---\nname: archive-skill\ndescription: Uploaded skill\n---\nHello\n'),
+    })
+    const formData = new FormData()
+    formData.set('file', new File([archive], 'archive-skill.zip', { type: 'application/zip' }))
+
+    const res = await app.request('/skills/install-from-archive', {
+      method: 'POST',
+      body: formData,
+    })
+
+    expect(res.status).toBe(200)
+    expect(capturedTargetDir).toBe(resolve(homedir(), '.youclaw', 'skills'))
   })
 
   test('POST /skills/install-from-archive rejects archives without a root SKILL.md', async () => {
@@ -671,7 +763,7 @@ describe('skills routes', () => {
     expect(capturedRepoUrl).toBe('https://github.com/acme/tools/tree/main/skills/github-ops')
   })
 
-  test('GET /skills classifies imported project skills as user external skills', async () => {
+  test('GET /skills keeps project-scoped skills in the builtin catalog', async () => {
     const root = mkdtempSync(resolve(tmpdir(), 'youclaw-route-skill-'))
     tempDirs.push(root)
 
@@ -712,6 +804,7 @@ describe('skills routes', () => {
     const res = await app.request('/skills')
     const body = await res.json() as Array<{
       name: string
+      source: string
       catalogGroup: string
       userSkillKind?: string
       externalSource?: string
@@ -720,13 +813,14 @@ describe('skills routes', () => {
     expect(res.status).toBe(200)
     expect(body[0]).toMatchObject({
       name: 'gradio',
-      catalogGroup: 'user',
-      userSkillKind: 'external',
-      externalSource: 'url',
+      source: 'builtin',
+      catalogGroup: 'builtin',
     })
+    expect(body[0]?.userSkillKind).toBeUndefined()
+    expect(body[0]?.externalSource).toBeUndefined()
   })
 
-  test('DELETE /skills/:name returns 403 for workspace-level skill', async () => {
+  test('DELETE /skills/:name allows workspace-level skill', async () => {
     const workspaceSkill = { ...baseSkill, source: 'workspace' }
     const app = createSkillsRoutes(
       {
@@ -736,12 +830,25 @@ describe('skills routes', () => {
         refresh: () => [workspaceSkill],
         loadSkillsForAgent: () => [workspaceSkill],
       } as any,
-      { getAgent: () => ({ config: { id: 'agent-1' } }) } as any,
+      {
+        getAgent: () => ({ config: { id: 'agent-1' } }),
+        getAgents: () => [],
+        reloadAgents: async () => {},
+      } as any,
     )
 
-    const res = await app.request('/skills/pdf', { method: 'DELETE' })
+    const { SkillsInstaller } = await import('../src/skills/installer.ts')
+    const origUninstall = SkillsInstaller.prototype.uninstall
+    const uninstallSpy = mock(async () => {})
+    SkillsInstaller.prototype.uninstall = uninstallSpy
 
-    expect(res.status).toBe(403)
+    try {
+      const res = await app.request('/skills/pdf', { method: 'DELETE' })
+      expect(res.status).toBe(200)
+      expect(uninstallSpy).toHaveBeenCalledWith('pdf', '/tmp')
+    } finally {
+      SkillsInstaller.prototype.uninstall = origUninstall
+    }
   })
 
   test('DELETE /skills/:name returns 404 for nonexistent skill', async () => {

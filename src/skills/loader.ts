@@ -377,7 +377,7 @@ export class SkillsLoader {
         const raw = readFileSync(skillFile, 'utf-8')
         const { frontmatter, content } = parseFrontmatter(raw)
         const { eligible, errors, detail } = checkEligibility(frontmatter)
-
+        // Read .registry.json metadata (if present)
         let registryMeta: SkillRegistryMeta | undefined
         const registryFile = resolve(skillDir, '.registry.json')
         if (existsSync(registryFile)) {

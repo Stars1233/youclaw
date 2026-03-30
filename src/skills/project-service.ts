@@ -379,13 +379,16 @@ export class SkillProjectService {
   }
 
   private buildReadonlyProject(skill: Skill): SkillProject {
-    const origin = skill.source === 'user'
-      ? (skill.registryMeta?.source === 'clawhub' ? 'marketplace' : 'manual')
-      : 'builtin'
+    const rootDir = resolve(skill.path, '..')
+    const meta = this.readProjectMeta(rootDir)
+    const origin = meta?.origin
+      ?? (skill.source === 'user'
+        ? (skill.registryMeta?.source === 'clawhub' || skill.registryMeta?.source === 'tencent' ? 'marketplace' : 'manual')
+        : 'builtin')
 
     return {
       name: skill.name,
-      rootDir: resolve(skill.path, '..'),
+      rootDir,
       entryFile: ENTRY_FILENAME,
       path: skill.path,
       source: skill.source,

@@ -78,7 +78,7 @@ export interface EligibilityDetail {
 
 export interface Skill {
   name: string
-  source: SkillRuntimeSource // Source tier
+  source: SkillRuntimeSource // Runtime source after resolving project metadata
   frontmatter: SkillFrontmatter
   content: string          // SKILL.md body (frontmatter stripped)
   path: string             // File path

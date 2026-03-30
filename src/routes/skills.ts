@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod/v4'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
 import { ROOT_DIR } from '../config/index.ts'
 import { getShellEnv, resetShellEnvCache } from '../utils/shell-env.ts'
@@ -14,8 +14,8 @@ import {
   SkillInstallSource,
   SkillProjectService,
   SkillsInstaller,
-  resolveExternalSkillSource,
   resolveManagedSkillCatalogInfo,
+  resolveRuntimeSkillCatalogInfo,
 } from '../skills/index.ts'
 import type { AgentManager } from '../agent/index.ts'
 import type {
@@ -116,30 +116,11 @@ function readRuntimeSkillProjectMeta(skill: Skill): SkillProjectMeta | null {
   }
 }
 
-function resolveRuntimeSkillCatalogInfo(skill: Skill): SkillCatalogInfo {
-  const projectMeta = readRuntimeSkillProjectMeta(skill)
-  const treatAsUserSkill = skill.source === 'user'
-    || Boolean(projectMeta && projectMeta.origin !== 'builtin')
-
-  if (!treatAsUserSkill) {
-    return {
-      catalogGroup: 'builtin',
-      sortTimestamp: undefined,
-    }
-  }
-
-  return {
-    catalogGroup: 'user',
-    userSkillKind: projectMeta?.managed ? 'custom' : 'external',
-    externalSource: projectMeta?.managed ? undefined : resolveExternalSkillSource(skill.registryMeta, projectMeta),
-    sortTimestamp: skill.registryMeta?.installedAt ?? projectMeta?.updatedAt ?? projectMeta?.createdAt,
-  }
-}
-
 function serializeSkill(skill: Skill): SerializedSkill {
+  const projectMeta = readRuntimeSkillProjectMeta(skill)
   return {
     ...skill,
-    ...resolveRuntimeSkillCatalogInfo(skill),
+    ...resolveRuntimeSkillCatalogInfo(skill, projectMeta),
   }
 }
 
@@ -493,7 +474,7 @@ export function createSkillsRoutes(
     }
 
     const { sourcePath, targetDir } = parsed.data
-    const dest = targetDir ?? resolve(ROOT_DIR, 'skills')
+    const dest = targetDir ?? resolve(homedir(), '.youclaw', 'skills')
 
     try {
       await installer.installFromLocal(sourcePath, dest, {
@@ -531,7 +512,7 @@ export function createSkillsRoutes(
 
     const dest = typeof rawTargetDir === 'string' && rawTargetDir.trim()
       ? rawTargetDir.trim()
-      : resolve(ROOT_DIR, 'skills')
+      : resolve(homedir(), '.youclaw', 'skills')
 
     const archive = new Uint8Array(await rawFile.arrayBuffer())
     const stageRoot = mkdtempSync(resolve(tmpdir(), 'youclaw-skill-upload-'))
@@ -576,7 +557,7 @@ export function createSkillsRoutes(
     }
 
     const { url, targetDir } = parsed.data
-    const dest = targetDir ?? resolve(ROOT_DIR, 'skills')
+    const dest = targetDir ?? resolve(homedir(), '.youclaw', 'skills')
 
     try {
       await installer.installFromUrl(url, dest, {
@@ -672,8 +653,8 @@ export function createSkillsRoutes(
       return c.json({ error: 'Skill not found' }, 404)
     }
 
-    if (skill.source === 'workspace') {
-      return c.json({ error: 'Cannot uninstall workspace-level skills via API' }, 403)
+    if (skill.source === 'builtin') {
+      return c.json({ error: 'Cannot uninstall builtin skills via API' }, 403)
     }
 
     try {
