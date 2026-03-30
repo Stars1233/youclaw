@@ -342,7 +342,6 @@ function ProfileDetail({
   onRestart: () => void
   onDelete: () => void
 }) {
-  const { t } = useI18n()
   const runtimeStatus = profile.runtime?.status ?? 'stopped'
   const running = runtimeStatus === 'running' || runtimeStatus === 'starting'
   const isExtensionRelay = profile.driver === 'extension-relay'
@@ -566,107 +565,21 @@ function ProfileDetail({
         <div className="rounded-2xl border border-border p-4 space-y-4">
           <MainBridgeCard
             mainBridge={mainBridge}
+            relay={relay}
             extensionPackage={extensionPackage}
             backendUrlHint={backendUrlHint}
+            relayUrl={relayUrl}
             onCreatePairing={handleCreatePairing}
             onUseRecommended={() => handleSelectMainBridgeBrowser(null)}
             onSelectBrowser={(browserId) => handleSelectMainBridgeBrowser(browserId)}
+            onRelayUrlChange={setRelayUrl}
+            onRelayConnect={handleRelayConnect}
+            onRelayDisconnect={handleRelayDisconnect}
+            onRelayRotateToken={handleRelayRotateToken}
+            showAdvancedRelay={showAdvancedRelay}
+            onToggleAdvancedRelay={() => setShowAdvancedRelay((current) => !current)}
             disabled={relayBusy !== null}
-            labels={{
-              title: t.browser.mainBridgeTitle,
-              body: t.browser.mainBridgeBody,
-              statusConnected: t.browser.mainBridgeStatusConnected,
-              statusPaired: t.browser.mainBridgeStatusPaired,
-              statusReady: t.browser.mainBridgeStatusReady,
-              statusNoBrowser: t.browser.mainBridgeStatusNoBrowser,
-              selectionLabel: t.browser.mainBridgeSelectionLabel,
-              selectionAuto: t.browser.mainBridgeSelectionAuto,
-              selectionManual: t.browser.mainBridgeSelectionManual,
-              selectionNone: t.browser.mainBridgeSelectionNone,
-              useRecommended: t.browser.mainBridgeUseRecommended,
-              selectLabel: t.browser.mainBridgeSelectLabel,
-              refresh: t.browser.mainBridgeRefresh,
-              copyBackend: t.browser.mainBridgeCopyBackend,
-              copyPairing: t.browser.mainBridgeCopyPairing,
-              pairingExpires: t.browser.mainBridgePairingExpires,
-              connectedSession: t.browser.mainBridgeConnectedSession,
-              detectedRecommended: t.browser.detectedRecommended,
-              detectedBrowsersEmpty: t.browser.detectedBrowsersEmpty,
-            }}
           />
-
-          <div className="rounded-xl border border-border/70 bg-muted/30 p-4">
-            <div className="text-sm font-medium text-foreground">{t.browser.relayAdvancedTitle}</div>
-            <p className="mt-2 text-xs leading-6 text-muted-foreground">{t.browser.relayAdvancedBody}</p>
-            <button
-              type="button"
-              onClick={() => setShowAdvancedRelay((current) => !current)}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
-            >
-              <Link className="h-3.5 w-3.5" />
-              {showAdvancedRelay ? 'Hide Advanced Relay' : 'Show Advanced Relay'}
-            </button>
-          </div>
-
-          {showAdvancedRelay && (
-            <div className="space-y-4 rounded-xl border border-border/70 bg-background/80 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1.5">Attach Token</div>
-                  <div className="text-sm font-mono break-all">{relay.token}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleRelayRotateToken}
-                  disabled={relayBusy !== null}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
-                >
-                  <RotateCw className="h-3.5 w-3.5" />
-                  Rotate Token
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium mb-1.5">Loopback CDP URL</label>
-                <input
-                  value={relayUrl}
-                  onChange={(e) => setRelayUrl(e.target.value)}
-                  placeholder="http://127.0.0.1:9222 or ws://127.0.0.1:9222/devtools/browser/..."
-                  className="w-full px-3 py-2 text-sm rounded-xl bg-muted border border-border focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Only loopback CDP URLs are accepted. This keeps the relay limited to a browser running on the same machine.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRelayConnect}
-                  disabled={relayBusy !== null || !relayUrl.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  <Link className="h-3.5 w-3.5" />
-                  Attach Relay
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRelayDisconnect}
-                  disabled={relayBusy !== null || !(mainBridge?.status === 'connected')}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
-                >
-                  <Square className="h-3.5 w-3.5" />
-                  Disconnect
-                </button>
-              </div>
-            </div>
-          )}
-
-          {relay.connectedAt && (
-            <div className="text-xs text-muted-foreground">
-              Connected at {new Date(relay.connectedAt).toLocaleString()}
-            </div>
-          )}
         </div>
       )}
 
@@ -712,112 +625,167 @@ function ProfileDetail({
 
 function MainBridgeCard({
   mainBridge,
+  relay,
   extensionPackage,
   backendUrlHint,
+  relayUrl,
   onCreatePairing,
   onUseRecommended,
   onSelectBrowser,
+  onRelayUrlChange,
+  onRelayConnect,
+  onRelayDisconnect,
+  onRelayRotateToken,
+  showAdvancedRelay,
+  onToggleAdvancedRelay,
   disabled,
-  labels,
 }: {
   mainBridge: BrowserMainBridgeDTO | null
+  relay: BrowserRelayDTO
   extensionPackage: BrowserExtensionPackageDTO | null
   backendUrlHint: string
+  relayUrl: string
   onCreatePairing: () => void
   onUseRecommended: () => void
   onSelectBrowser: (browserId: string | null) => void
+  onRelayUrlChange: (value: string) => void
+  onRelayConnect: () => void
+  onRelayDisconnect: () => void
+  onRelayRotateToken: () => void
+  showAdvancedRelay: boolean
+  onToggleAdvancedRelay: () => void
   disabled: boolean
-  labels: {
-    title: string
-    body: string
-    statusConnected: string
-    statusPaired: string
-    statusReady: string
-    statusNoBrowser: string
-    selectionLabel: string
-    selectionAuto: string
-    selectionManual: string
-    selectionNone: string
-    useRecommended: string
-    selectLabel: string
-    refresh: string
-    copyBackend: string
-    copyPairing: string
-    pairingExpires: string
-    connectedSession: string
-    detectedRecommended: string
-    detectedBrowsersEmpty: string
-  }
 }) {
+  const { t } = useI18n()
+  const effectiveBackendUrl = backendUrlHint || 'http://127.0.0.1:62601'
   const statusText =
     mainBridge?.status === 'connected'
-      ? labels.statusConnected
+      ? t.browser.mainBridgeStatusConnected
       : mainBridge?.status === 'paired'
-        ? labels.statusPaired
+        ? t.browser.mainBridgeStatusPaired
       : mainBridge?.status === 'ready'
-        ? labels.statusReady
-        : labels.statusNoBrowser
+        ? t.browser.mainBridgeStatusReady
+        : t.browser.mainBridgeStatusNoBrowser
 
   const selectionText =
     mainBridge?.selectionSource === 'profile'
-      ? labels.selectionManual
+      ? t.browser.mainBridgeSelectionManual
       : mainBridge?.selectionSource === 'recommended'
-        ? labels.selectionAuto
-        : labels.selectionNone
+        ? t.browser.mainBridgeSelectionAuto
+        : t.browser.mainBridgeSelectionNone
+
+  const stepChooseDone = Boolean(mainBridge?.selectedBrowserName)
+  const stepInstallDone =
+    mainBridge?.status === 'paired' ||
+    (mainBridge?.status === 'connected' && mainBridge.connectionMode === 'extension-bridge')
+  const stepPairDone =
+    Boolean(mainBridge?.pairingCode) ||
+    mainBridge?.status === 'paired' ||
+    (mainBridge?.status === 'connected' && mainBridge.connectionMode === 'extension-bridge')
+  const stepConnectDone =
+    mainBridge?.status === 'connected' && mainBridge.connectionMode === 'extension-bridge'
+
+  const copyText = (text: string, successMessage: string, errorMessage: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      notify.success(successMessage)
+    }).catch((err) => {
+      notify.error(err instanceof Error ? err.message : errorMessage, {
+        durationMs: 6000,
+      })
+    })
+  }
 
   return (
-    <div className="rounded-xl border border-border/70 bg-background/80 p-4 space-y-4">
+    <div className="space-y-4">
       <div>
-        <div className="text-sm font-medium text-foreground">{labels.title}</div>
-        <p className="mt-2 text-xs leading-6 text-muted-foreground">{labels.body}</p>
+        <div className="text-sm font-medium text-foreground">{t.browser.mainBridgeTitle}</div>
+        <p className="mt-2 text-xs leading-6 text-muted-foreground">{t.browser.mainBridgeBody}</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <InfoCard label="Status" value={statusText} />
-        <InfoCard label={labels.selectionLabel} value={mainBridge?.selectedBrowserName ?? selectionText} />
+        <InfoCard label={t.browser.mainBridgeSelectionLabel} value={mainBridge?.selectedBrowserName ?? selectionText} />
       </div>
 
-      {mainBridge?.connectedBrowserName && (
-        <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2">
-          <div className="text-xs text-muted-foreground">{labels.connectedSession}</div>
-          <div className="text-sm font-medium text-foreground">{mainBridge.connectedBrowserName}</div>
-          <div className="text-xs text-muted-foreground">Mode: {mainBridge.connectionMode}</div>
-          {mainBridge.connectedAt && (
-            <div className="text-xs text-muted-foreground">
-              Connected at {new Date(mainBridge.connectedAt).toLocaleString()}
-            </div>
-          )}
-          {mainBridge.connectedTabTitle && (
-            <div className="text-sm text-foreground break-words">{mainBridge.connectedTabTitle}</div>
-          )}
-          {mainBridge.connectedTabUrl && (
-            <div className="text-xs text-muted-foreground break-all">{mainBridge.connectedTabUrl}</div>
-          )}
-        </div>
-      )}
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {t.browser.mainBridgeStepsTitle}
+      </div>
 
-      <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">
-        <div className="text-sm font-medium text-foreground">Install Extension</div>
+      <StepCard title={t.browser.mainBridgeStepChoose} done={stepChooseDone}>
+        <p className="text-xs leading-6 text-muted-foreground">
+          Pick the browser you want YouClaw to treat as your main browser. If you do nothing, the recommended browser will stay selected.
+        </p>
+
+        {mainBridge && mainBridge.browsers.length > 0 ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onUseRecommended}
+                disabled={disabled}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                {t.browser.mainBridgeUseRecommended}
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1.5">{t.browser.mainBridgeSelectLabel}</label>
+              <select
+                value={mainBridge.selectedBrowserId ?? '__recommended__'}
+                onChange={(e) => onSelectBrowser(e.target.value === '__recommended__' ? null : e.target.value)}
+                disabled={disabled}
+                className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+              >
+                <option value="__recommended__">{t.browser.mainBridgeUseRecommended}</option>
+                {mainBridge.browsers.map((browser) => (
+                  <option key={browser.id} value={browser.id}>
+                    {browser.name}{browser.isRecommended ? ` · ${t.browser.detectedRecommended}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+              {mainBridge.browsers.map((browser) => (
+                <div key={browser.id} className="rounded-xl border border-border/70 bg-background/70 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-medium text-foreground">{browser.name}</div>
+                    {browser.isRecommended && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {t.browser.detectedRecommended}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground break-all">{browser.executablePath}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t.browser.detectedBrowsersEmpty}</p>
+        )}
+      </StepCard>
+
+      <StepCard title={t.browser.mainBridgeStepInstall} done={stepInstallDone}>
+        <p className="text-xs leading-6 text-muted-foreground">
+          Install the unpacked extension in the selected browser. This is the preferred path for connecting the browser tab you already use.
+        </p>
+
         {extensionPackage ? (
           <>
             <div className="grid gap-4 md:grid-cols-2">
               <InfoCard label="Version" value={extensionPackage.version} />
-              <InfoCard label="Backend URL" value={backendUrlHint || 'http://127.0.0.1:62601'} />
+              <InfoCard label="Backend URL" value={effectiveBackendUrl} />
             </div>
             <InfoCard label="Extension Path" value={extensionPackage.directoryPath} />
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => navigator.clipboard.writeText(backendUrlHint || 'http://127.0.0.1:62601').then(() => {
-                  notify.success('Backend URL copied.')
-                }).catch((err) => {
-                  notify.error(err instanceof Error ? err.message : 'Failed to copy backend URL', {
-                    durationMs: 6000,
-                  })
-                })}
+                onClick={() => copyText(effectiveBackendUrl, 'Backend URL copied.', 'Failed to copy backend URL')}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
               >
-                {labels.copyBackend}
+                {t.browser.mainBridgeCopyBackend}
               </button>
               <button
                 type="button"
@@ -832,20 +800,14 @@ function MainBridgeCard({
               </button>
               <button
                 type="button"
-                onClick={() => navigator.clipboard.writeText(extensionPackage.directoryPath).then(() => {
-                  notify.success('Extension path copied.')
-                }).catch((err) => {
-                  notify.error(err instanceof Error ? err.message : 'Failed to copy extension path', {
-                    durationMs: 6000,
-                  })
-                })}
+                onClick={() => copyText(extensionPackage.directoryPath, 'Extension path copied.', 'Failed to copy extension path')}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
               >
                 Copy Extension Path
               </button>
             </div>
             <div className="text-xs text-muted-foreground leading-6">
-              Load the unpacked extension from the directory above, open the extension popup, enter the backend URL and pairing code, then click “Connect Current Tab”.
+              Open `chrome://extensions` in the target browser, enable Developer Mode, then click “Load unpacked” and choose the directory above.
             </div>
           </>
         ) : (
@@ -853,9 +815,13 @@ function MainBridgeCard({
             Extension package metadata is not available yet.
           </div>
         )}
-      </div>
+      </StepCard>
 
-      <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">
+      <StepCard title={t.browser.mainBridgeStepPair} done={stepPairDone}>
+        <p className="text-xs leading-6 text-muted-foreground">
+          Generate a pairing code, then enter it in the extension popup together with the backend URL.
+        </p>
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -866,13 +832,14 @@ function MainBridgeCard({
             {mainBridge?.pairingCode ? 'Refresh Pairing Code' : 'Generate Pairing Code'}
           </button>
         </div>
+
         {mainBridge?.pairingCode ? (
-          <div className="space-y-1">
+          <div className="space-y-1 rounded-xl border border-border/70 bg-muted/20 p-4">
             <div className="text-xs text-muted-foreground">Pairing Code</div>
             <div className="font-mono text-sm text-foreground">{mainBridge.pairingCode}</div>
             {mainBridge.pairingCodeExpiresAt && (
               <div className="text-xs text-muted-foreground">
-                {labels.pairingExpires} {new Date(mainBridge.pairingCodeExpiresAt).toLocaleString()}
+                {t.browser.mainBridgePairingExpires} {new Date(mainBridge.pairingCodeExpiresAt).toLocaleString()}
               </div>
             )}
             <div className="text-xs text-muted-foreground">
@@ -881,16 +848,10 @@ function MainBridgeCard({
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => navigator.clipboard.writeText(mainBridge.pairingCode ?? '').then(() => {
-                  notify.success('Pairing code copied.')
-                }).catch((err) => {
-                  notify.error(err instanceof Error ? err.message : 'Failed to copy pairing code', {
-                    durationMs: 6000,
-                  })
-                })}
+                onClick={() => copyText(mainBridge.pairingCode ?? '', 'Pairing code copied.', 'Failed to copy pairing code')}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
               >
-                {labels.copyPairing}
+                {t.browser.mainBridgeCopyPairing}
               </button>
               <button
                 type="button"
@@ -898,66 +859,148 @@ function MainBridgeCard({
                 disabled={disabled}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50"
               >
-                {labels.refresh}
+                {t.browser.mainBridgeRefresh}
               </button>
             </div>
           </div>
         ) : (
           <div className="text-xs text-muted-foreground">
-            Generate a pairing code, then use it in the extension popup to connect the current tab.
+            Generate a pairing code first, then keep the popup open while you connect the target tab.
           </div>
         )}
-      </div>
+      </StepCard>
 
-      {mainBridge && mainBridge.browsers.length > 0 ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onUseRecommended}
-              disabled={disabled}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50"
-            >
-              {labels.useRecommended}
-            </button>
-          </div>
+      <StepCard title={t.browser.mainBridgeStepConnect} done={stepConnectDone}>
+        <p className="text-xs leading-6 text-muted-foreground">
+          Open the tab you want YouClaw to control, then use the browser extension popup and click “Connect Current Tab”.
+        </p>
 
-          <div>
-            <label className="block text-xs font-medium mb-1.5">{labels.selectLabel}</label>
-            <select
-              value={mainBridge.selectedBrowserId ?? '__recommended__'}
-              onChange={(e) => onSelectBrowser(e.target.value === '__recommended__' ? null : e.target.value)}
-              disabled={disabled}
-              className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-            >
-              <option value="__recommended__">{labels.useRecommended}</option>
-              {mainBridge.browsers.map((browser) => (
-                <option key={browser.id} value={browser.id}>
-                  {browser.name}{browser.isRecommended ? ` · ${labels.detectedRecommended}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-            {mainBridge.browsers.map((browser) => (
-              <div key={browser.id} className="rounded-xl border border-border/70 bg-background/70 px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="font-medium text-foreground">{browser.name}</div>
-                  {browser.isRecommended && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      {labels.detectedRecommended}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground break-all">{browser.executablePath}</div>
+        {mainBridge?.connectedBrowserName ? (
+          <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2">
+            <div className="text-xs text-muted-foreground">{t.browser.mainBridgeConnectedSession}</div>
+            <div className="text-sm font-medium text-foreground">{mainBridge.connectedBrowserName}</div>
+            <div className="text-xs text-muted-foreground">Mode: {mainBridge.connectionMode}</div>
+            {mainBridge.connectedAt && (
+              <div className="text-xs text-muted-foreground">
+                Connected at {new Date(mainBridge.connectedAt).toLocaleString()}
               </div>
-            ))}
+            )}
+            {mainBridge.connectedTabTitle && (
+              <div className="text-sm text-foreground break-words">{mainBridge.connectedTabTitle}</div>
+            )}
+            {mainBridge.connectedTabUrl && (
+              <div className="text-xs text-muted-foreground break-all">{mainBridge.connectedTabUrl}</div>
+            )}
           </div>
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">{labels.detectedBrowsersEmpty}</p>
-      )}
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 p-4 text-xs leading-6 text-muted-foreground">
+            No browser tab is connected yet. After you finish the first three steps, switch to the tab you want to control and connect it from the extension popup.
+          </div>
+        )}
+      </StepCard>
+
+      <StepCard title={t.browser.mainBridgeStepAdvanced}>
+        <p className="text-xs leading-6 text-muted-foreground">{t.browser.relayAdvancedBody}</p>
+        <button
+          type="button"
+          onClick={onToggleAdvancedRelay}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition-colors"
+        >
+          <Link className="h-3.5 w-3.5" />
+          {showAdvancedRelay ? 'Hide Advanced Relay' : 'Show Advanced Relay'}
+        </button>
+
+        {showAdvancedRelay && (
+          <div className="space-y-4 rounded-xl border border-border/70 bg-background/80 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1.5">Attach Token</div>
+                <div className="text-sm font-mono break-all">{relay.token}</div>
+              </div>
+              <button
+                type="button"
+                onClick={onRelayRotateToken}
+                disabled={disabled}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                <RotateCw className="h-3.5 w-3.5" />
+                Rotate Token
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1.5">Loopback CDP URL</label>
+              <input
+                value={relayUrl}
+                onChange={(e) => onRelayUrlChange(e.target.value)}
+                placeholder="http://127.0.0.1:9222 or ws://127.0.0.1:9222/devtools/browser/..."
+                className="w-full px-3 py-2 text-sm rounded-xl bg-muted border border-border focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                Only loopback CDP URLs are accepted. This keeps the relay limited to a browser running on the same machine.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onRelayConnect}
+                disabled={disabled || !relayUrl.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                <Link className="h-3.5 w-3.5" />
+                Attach Relay
+              </button>
+              <button
+                type="button"
+                onClick={onRelayDisconnect}
+                disabled={disabled || !(mainBridge?.status === 'connected')}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                <Square className="h-3.5 w-3.5" />
+                Disconnect
+              </button>
+            </div>
+
+            {relay.connectedAt && (
+              <div className="text-xs text-muted-foreground">
+                Connected at {new Date(relay.connectedAt).toLocaleString()}
+              </div>
+            )}
+          </div>
+        )}
+      </StepCard>
+    </div>
+  )
+}
+
+function StepCard({
+  title,
+  done,
+  children,
+}: {
+  title: string
+  done?: boolean
+  children: ReactNode
+}) {
+  const { t } = useI18n()
+
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/80 p-4 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-sm font-medium text-foreground">{title}</div>
+        {typeof done === 'boolean' && (
+          <span
+            className={cn(
+              'rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]',
+              done ? 'bg-emerald-500/10 text-emerald-400' : 'bg-primary/10 text-primary',
+            )}
+          >
+            {done ? t.browser.mainBridgeStepDone : t.browser.mainBridgeStepTodo}
+          </span>
+        )}
+      </div>
+      <div className="space-y-3">{children}</div>
     </div>
   )
 }
