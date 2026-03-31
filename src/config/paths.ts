@@ -4,7 +4,6 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
-  renameSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -86,20 +85,13 @@ function hasInitializedDataDir(dir: string): boolean {
   }
 }
 
-function moveOrCopyDir(sourceDir: string, targetDir: string): void {
+function copyDir(sourceDir: string, targetDir: string): void {
   if (existsSync(targetDir) && !hasInitializedDataDir(targetDir)) {
     rmSync(targetDir, { recursive: true, force: true })
   }
 
-  try {
-    renameSync(sourceDir, targetDir)
-    return
-  } catch {
-    mkdirSync(dirname(targetDir), { recursive: true })
-  }
-
+  mkdirSync(dirname(targetDir), { recursive: true })
   cpSync(sourceDir, targetDir, { recursive: true })
-  rmSync(sourceDir, { recursive: true, force: true })
 }
 
 export function resolveProductionDataDir(): string {
@@ -116,7 +108,7 @@ export function resolveProductionDataDir(): string {
 
   try {
     mkdirSync(dirname(targetDir), { recursive: true })
-    moveOrCopyDir(legacyDir, targetDir)
+    copyDir(legacyDir, targetDir)
     console.info(`[DATA_DIR] Migrated legacy data directory to ${targetDir}`)
     return targetDir
   } catch (error) {
