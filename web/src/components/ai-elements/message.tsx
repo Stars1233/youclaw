@@ -16,7 +16,6 @@ import {
 import { cn } from "@/lib/utils";
 import { LinkSafetyModal } from "./link-safety-modal";
 import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import {
   CodeBlock,
@@ -329,7 +328,44 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
-const streamdownPlugins = { cjk, code };
+// @streamdown/code statically imports shiki which uses oniguruma-to-es with
+// named capture group regex. Older WebKit (macOS < 13.4) throws SyntaxError
+// at parse time. Dynamic import isolates the failure gracefully.
+type CodePlugin = { code: unknown };
+let resolvedCodePlugin: CodePlugin | null = null;
+const codePluginPromise = import("@streamdown/code")
+  .then((mod) => {
+    resolvedCodePlugin = { code: mod.code };
+  })
+  .catch(() => {
+    // Syntax highlighting unavailable on this engine — silent fallback
+  });
+// Subscribers notified when code plugin becomes available
+const codePluginListeners = new Set<() => void>();
+codePluginPromise.then(() => {
+  for (const fn of codePluginListeners) fn();
+  codePluginListeners.clear();
+});
+
+function useStreamdownPlugins() {
+  const [plugins, setPlugins] = useState(() =>
+    resolvedCodePlugin ? { cjk, ...resolvedCodePlugin } : { cjk }
+  );
+
+  useEffect(() => {
+    if (resolvedCodePlugin) {
+      setPlugins({ cjk, ...resolvedCodePlugin });
+      return;
+    }
+    const listener = () => {
+      if (resolvedCodePlugin) setPlugins({ cjk, ...resolvedCodePlugin });
+    };
+    codePluginListeners.add(listener);
+    return () => { codePluginListeners.delete(listener); };
+  }, []);
+
+  return plugins;
+}
 const codeLanguagePattern = /language-([^\s]+)/;
 const startLinePattern = /\{(\d+)\}/;
 const tableDownloadTriggerTitle = "Download table";
@@ -417,6 +453,7 @@ const linkSafetyConfig = {
 export const MessageResponse = memo(
   ({ className, components, ...props }: MessageResponseProps) => {
     const { t } = useI18n();
+    const plugins = useStreamdownPlugins();
     const mergedComponents = useMemo(
       () => ({
         ...components,
@@ -453,7 +490,7 @@ export const MessageResponse = memo(
             className
           )}
           components={mergedComponents}
-          plugins={streamdownPlugins}
+          plugins={plugins}
           linkSafety={linkSafetyConfig}
           {...props}
         />

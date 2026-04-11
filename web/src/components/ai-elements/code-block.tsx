@@ -26,7 +26,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { createHighlighter } from "shiki";
+// Dynamic import: shiki v4 uses oniguruma-to-es which contains named capture
+// group regex literals. Older WebKit (macOS < 13.4 / Safari < 16.4) throws
+// SyntaxError at parse time for these. Dynamic import isolates the failure so
+// the rest of the app keeps working with plain-text fallback.
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 // biome-ignore lint/suspicious/noBitwiseOperators: shiki bitflag check
@@ -144,10 +147,12 @@ const getHighlighter = (
     return cached;
   }
 
-  const highlighterPromise = createHighlighter({
-    langs: [language],
-    themes: ["github-light", "github-dark"],
-  });
+  const highlighterPromise = import("shiki").then(({ createHighlighter }) =>
+    createHighlighter({
+      langs: [language],
+      themes: ["github-light", "github-dark"],
+    })
+  );
 
   highlighterCache.set(language, highlighterPromise);
   return highlighterPromise;
@@ -227,7 +232,17 @@ export const highlightCode = (
     })
     // oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-then), eslint-plugin-promise(prefer-await-to-callbacks)
     .catch((error) => {
-      console.error("Failed to highlight code:", error);
+      // Shiki v4 uses named capture groups which are unsupported on older WebKit
+      // (e.g. macOS 13.x / Safari < 16.4). Fall back to raw tokens gracefully.
+      console.warn("Syntax highlighting unavailable, using plain text:", error);
+      const raw = createRawTokens(code);
+      tokensCache.set(tokensCacheKey, raw);
+      const subs = subscribers.get(tokensCacheKey);
+      if (subs) {
+        for (const sub of subs) {
+          sub(raw);
+        }
+      }
       subscribers.delete(tokensCacheKey);
     });
 

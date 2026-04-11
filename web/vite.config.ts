@@ -16,6 +16,23 @@ export default defineConfig({
     target: ['es2020', 'safari13'],
   },
   plugins: [
+    // Rewrite named capture groups to numbered groups for older WebKit compat
+    // (macOS < 13.4 / Safari < 16.4 doesn't support named groups in regex).
+    // marked v17 uses (?<a>...) \k<a> and (?<b>...) \k<b> for backtick matching.
+    {
+      name: 'regex-compat',
+      enforce: 'pre' as const,
+      transform(code, id) {
+        if (!id.includes('marked')) return
+        // Each named group (?<x>...) becomes (...) and \k<x> becomes \1
+        // These are self-contained regexes where the named group is group #1
+        let result = code
+          .replaceAll('(?<a>', '(').replaceAll('\\k<a>', '\\1')
+          .replaceAll('(?<b>', '(').replaceAll('\\k<b>', '\\1')
+        if (result === code) return
+        return { code: result, map: null }
+      },
+    },
     react(),
     tailwindcss(),
     // SSE proxy plugin: bypass Vite default proxy response buffering
